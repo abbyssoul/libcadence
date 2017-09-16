@@ -1,0 +1,119 @@
+
+PROJECT = ghost
+
+# Project directory layout
+TARGET_DIR = bin
+PUBLIC_HEADERS = include
+BUILD_DIR = build
+SRC_DIR = src
+SRC_PROTO_DIR = $(SRC_DIR)/proto
+GEN_SRC_DIR = $(SRC_DIR)/generated
+TARGET = $(TARGET_DIR)/lib$(PROJECT).a
+
+
+src = $(wildcard $(SRC_DIR)/*.cpp)
+proto = $(wildcard $(SRC_PROTO_DIR)/*.capnp)
+
+generated_proto = $(proto:.capnp=.capnp.c++)
+generated_src = $(patsubst $(SRC_PROTO_DIR),$(GEN_SRC_DIR),$(generated_proto))
+
+
+obj = $(addprefix $(BUILD_DIR)/, $(src:.cpp=.o))
+dep = $(obj:.o=.d)  # one dependency file for each source
+
+
+CXXFLAGS += -std=c++14 -pipe -fstack-protector -ftemplate-depth=128
+CXXFLAGS += -pedantic -Wall -Wextra -Wabi -Wfloat-equal \
+-Wshadow -Wno-missing-field-initializers -Wno-missing-braces \
+-Wcast-qual -Wno-sign-compare -Wno-multichar
+# Release optimizations
+#CXXFLAGS += -Ofast -flto
+CXXFLAGS += -O0 -D _DEBUG -ggdb3
+
+
+CPPFLAGS += -I$(SRC_DIR) -I$(PUBLIC_HEADERS) -D_FORTIFY_SOURCE=2
+CPPFLAGS += -I../libsolace/include
+
+LDFLAGS +=  -L../libsolace/build/libsolace \
+			-L../libsolace/build/libs/fmt/fmt
+
+
+all: $(PROJECT)
+gen_proto: $(GEN_SRC_DIR) $(generated_src)
+
+#-------------------------------------------------------------------------------
+# Build the project
+#-------------------------------------------------------------------------------
+$(BUILD_DIR):
+	mkdir -p $@
+
+$(TARGET_DIR):
+	mkdir -p $@
+
+$(GEN_SRC_DIR):
+	mkdir -p $@
+
+$(generated_src): $(GEN_SRC_DIR)
+
+%.capnp.c++: %.capnp
+	capnp compile -oc++:$(GEN_SRC_DIR) --src-prefix=$(SRC_DIR)/proto -I/usr/include/ $<
+
+%.capnp.h++: %.capnp
+	capnp compile -oc++:$(GEN_SRC_DIR) --src-prefix=$(SRC_DIR)/proto -I/usr/include/ $<
+
+$(src): $(generated_src)
+
+
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+
+$(TARGET): $(obj)
+	@mkdir -p $(dir $@)
+	$(AR) -rcs $@ $^
+
+$(PROJECT): $(TARGET)
+
+
+-include $(dep)   # include all dep files in the makefile
+
+# rule to generate a dep file by using the C preprocessor
+# (see man cpp for details on the -MM and -MT options)
+$(BUILD_DIR)/%.d: %.cpp
+	@echo "Building dep for $<"
+	@mkdir -p $(dir $@)
+	$(CPP) $(CXXFLAGS) $(CPPFLAGS) $< -MM -MT $(@:.d=.o) >$@
+
+#-------------------------------------------------------------------------------
+# Build docxygen documentation
+#-------------------------------------------------------------------------------
+$(DOC_TARGET):
+	doxygen doc/Doxyfile
+
+# Build project doxygen docs doxyfile.inc
+doc: $(MODULE_HEADERS) $(MODULE_SRC) $(DOC_TARGET)
+
+
+
+#-------------------------------------------------------------------------------
+# Install
+#-------------------------------------------------------------------------------
+
+.PHONY: install
+install: $(TARGET)
+	@install -v -D -t $(DESTDIR)$(PREFIX)/bin $(TARGET)
+
+
+.PHONY: uninstall
+uninstall:
+	$(RM) -f $(DESTDIR)$(PREFIX)/bin/$(PROJECT)
+
+
+#-------------------------------------------------------------------------------
+# Cleanup
+#-------------------------------------------------------------------------------
+
+.PHONY: clean
+clean:
+	$(RM) -rf $(DOC_TARGET) $(BUILD_DIR) $(GEN_SRC_DIR)

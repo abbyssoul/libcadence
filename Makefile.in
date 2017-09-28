@@ -2,7 +2,7 @@
 export PROJECT = cadence
 
 # Project directory layout
-TARGET_DIR = bin
+TARGET_DIR = libs
 TARGET = $(TARGET_DIR)/lib$(PROJECT).a
 
 export PUBLIC_HEADERS = include
@@ -51,7 +51,7 @@ endif
 
 
 CPPFLAGS += -I$(PUBLIC_HEADERS) -D_FORTIFY_SOURCE=2
-CPPFLAGS += -Ilibs/asio/asio/include \
+CPPFLAGS += -Iexternal/asio/asio/include \
 			-I../libsolace/include
 
 # LD flags and LIBS only make sense for tests and example when building a library project

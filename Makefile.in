@@ -2,7 +2,7 @@
 export PROJECT = cadence
 
 # Project directory layout
-TARGET_DIR = libs
+TARGET_DIR = lib
 TARGET = $(TARGET_DIR)/lib$(PROJECT).a
 
 export PUBLIC_HEADERS = include
@@ -20,12 +20,14 @@ export EXAMPLES_SRC_DIR = examples
 
 
 src = $(wildcard $(SRC_DIR)/*.cpp) \
-	  $(wildcard $(SRC_DIR)/async/*.cpp)
+	  $(wildcard $(SRC_DIR)/async/*.cpp) \
+	  $(wildcard $(SRC_DIR)/protocols/*.cpp)
 
 proto = $(wildcard $(SRC_PROTO_DIR)/*.capnp)
 
 test_src =	$(wildcard $(TEST_SRC_DIR)/*.cpp) \
 			$(wildcard $(TEST_SRC_DIR)/ci/*.cpp) \
+			$(wildcard $(TEST_SRC_DIR)/protocols/*.cpp) \
 			$(wildcard $(TEST_SRC_DIR)/async/*.cpp)
 
 generated_proto = $(proto:.capnp=.capnp.c++)

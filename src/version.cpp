@@ -6,10 +6,6 @@
 *
 *  Written by Ivan Ryabov <abbyssoul@gmail.com>
 */
-/*******************************************************************************
- * libcadence: Library version compile and linked version
- *	@file		version.cpp
- ******************************************************************************/
 #include "cadence/version.hpp"
 
 

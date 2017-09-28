@@ -1,6 +1,14 @@
 # This file is used to ignore files which are generated
 # ----------------------------------------------------------------------------
+bin/
+build/
+doc/html
+libs/*/
+tools/*/
+coverage.info
+Makefile
 
+<
 *~
 *.autosave
 *.a

@@ -1,0 +1,24 @@
+EXAMPLES_BIN = ../$(BUILD_DIR)/bin
+EXAMPLES_BUILD = ../$(BUILD_DIR)/examples
+
+LOCAL_CPPFLAGS = $(patsubst -I%,-I../%,$(CPPFLAGS))
+LOCAL_LDFLAGS = $(patsubst -L%,-L../%,$(LDFLAGS))
+
+
+all: $(EXAMPLES_BIN)/async_serial
+
+
+$(EXAMPLES_BUILD):
+	@mkdir -p $@
+
+$(EXAMPLES_BIN):
+	@mkdir -p $@
+
+$(EXAMPLES_BUILD)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) -c $(LOCAL_CXXFLAGS) $(LOCAL_CPPFLAGS) -o $@ $<
+
+
+# Async_serial
+$(EXAMPLES_BIN)/async_serial: $(EXAMPLES_BUILD)/async_serial.o $(EXAMPLES_BIN)
+	$(CXX) -o $@ $(LOCAL_CXXFLAGS) $< $(LOCAL_LDFLAGS) $(LIBS)

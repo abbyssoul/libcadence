@@ -22,14 +22,13 @@ using namespace cadence;
 
 
 
-static constexpr P9Protocol::size_type MAX_MESSAGE_SIZE = 4*1024;
-
-const P9Protocol::Tag P9Protocol::NO_TAG = static_cast<P9Protocol::Tag>(~0);
-const P9Protocol::fid_type P9Protocol::NOFID = static_cast<P9Protocol::fid_type>(~0);
+const P9Protocol::size_type P9Protocol::MAX_MESSAGE_SIZE = 4*1024;  // 4k should be enough for everyone, am I right?
+const String                P9Protocol::PROTOCOL_VERSION = "9P2000.x";
+const P9Protocol::Tag       P9Protocol::NO_TAG = static_cast<P9Protocol::Tag>(~0);
+const P9Protocol::fid_type  P9Protocol::NOFID = static_cast<P9Protocol::fid_type>(~0);
 
 
 static const char* UNKNOWN_PROTOCOL_VERSION = "unknown";
-const String P9Protocol::PROTOCOL_VERSION = "9P2000.x";
 
 
 
@@ -140,14 +139,9 @@ void readStat(ByteBuffer& src, P9Protocol::Stat* stat) {
 }
 
 
-
-//P9Protocol::Tag P9Protocol::nextTag() {
-//    return _currentTag + 1;
-//}
-
-//P9Protocol::fid_type P9Protocol::allocateFid() {
-//    return 2 * _currentTag + 1; // FIXME: It is really WTF!
-//}
+P9Protocol::fid_type P9Protocol::allocateFid() {
+    return 2 * _currentTag + 1;  // FIXME: It is really WTF!
+}
 
 
 P9Protocol::Tag P9Protocol::createVersionRequest(Tag, ByteBuffer& dest, const String& version) {
@@ -167,7 +161,8 @@ P9Protocol::Tag P9Protocol::createVersionRequest(Tag, ByteBuffer& dest, const St
 
 
 P9Protocol::Tag
-P9Protocol::createAuthRequest(Tag tag, ByteBuffer& dest, fid_type afid, const String& userName, const String& attachName) {
+P9Protocol::createAuthRequest(Tag tag, ByteBuffer& dest, fid_type afid,
+                              const String& userName, const String& attachName) {
     // Compute message size first:
     const size_type messageSize = headerSize() +
             sizeof(fid_type) +                  // Proposed fid for authentication mechanism
@@ -280,7 +275,8 @@ P9Protocol::createCreateRequest(Tag tag, ByteBuffer& dest,
 
 
 P9Protocol::Tag
-P9Protocol::createReadRequest(Tag tag, ByteBuffer& dest, fid_type fid, uint64 offset, size_type count) {
+P9Protocol::createReadRequest(Tag tag, ByteBuffer& dest,
+                              fid_type fid, uint64 offset, size_type count) {
     // Compute message size first:
     const size_type messageSize = headerSize() +
             sizeof(fid) +
@@ -297,7 +293,8 @@ P9Protocol::createReadRequest(Tag tag, ByteBuffer& dest, fid_type fid, uint64 of
 
 
 P9Protocol::Tag
-P9Protocol::createWriteRequest(Tag tag, ByteBuffer& dest, fid_type fid, uint64 offset, size_type count, const byte* data) {
+P9Protocol::createWriteRequest(Tag tag, ByteBuffer& dest,
+                               fid_type fid, uint64 offset, size_type count, const byte* data) {
     // Compute message size first:
     const size_type messageSize = headerSize() +
             sizeof(fid) +
@@ -316,7 +313,8 @@ P9Protocol::createWriteRequest(Tag tag, ByteBuffer& dest, fid_type fid, uint64 o
 
 
 P9Protocol::Tag
-P9Protocol::createWalkRequest(Tag tag, ByteBuffer& dest, fid_type fid, fid_type nfid, const Path& path) {
+P9Protocol::createWalkRequest(Tag tag, ByteBuffer& dest,
+                              fid_type fid, fid_type nfid, const Path& path) {
     // Compute message size first:
     const size_type messageSize = headerSize() +
             sizeof(fid) +
@@ -337,7 +335,8 @@ P9Protocol::createWalkRequest(Tag tag, ByteBuffer& dest, fid_type fid, fid_type 
 
 
 P9Protocol::Tag
-P9Protocol::createStatRequest(Tag tag, Solace::ByteBuffer& dest, fid_type fid) {
+P9Protocol::createStatRequest(Tag tag, Solace::ByteBuffer& dest,
+                              fid_type fid) {
     // Compute message size first:
     const size_type messageSize = headerSize() +
             sizeof(fid);
@@ -350,7 +349,8 @@ P9Protocol::createStatRequest(Tag tag, Solace::ByteBuffer& dest, fid_type fid) {
 
 
 P9Protocol::Tag
-P9Protocol::createWriteStatRequest(Tag tag, Solace::ByteBuffer& dest, fid_type fid, const Stat& stat) {
+P9Protocol::createWriteStatRequest(Tag tag, Solace::ByteBuffer& dest,
+                                   fid_type fid, const Stat& stat) {
     // Compute message size first:
     const size_type messageSize = headerSize() +
             sizeof(fid) +
@@ -361,11 +361,6 @@ P9Protocol::createWriteStatRequest(Tag tag, Solace::ByteBuffer& dest, fid_type f
     writeStat(dest, stat);
 
     return tag;
-}
-
-
-P9Protocol::size_type P9Protocol::maxPossibleMessageSize() const noexcept {
-    return MAX_MESSAGE_SIZE;
 }
 
 
@@ -514,7 +509,11 @@ P9Protocol::parseWalkResponse(const MessageHeader& header, ByteBuffer& data) {
 
 Result<P9Protocol::MessageHeader, Error>
 P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
-    Solace::assertIndexInRange(buffer.viewWritten().size(), 0, headerSize());
+//    Solace::assertIndexInRange(buffer.viewWritten().size(), 0, headerSize());
+    const auto mandatoryHeaderSize = headerSize();
+    const auto dataAvailliable = buffer.remaining();
+    if (dataAvailliable < mandatoryHeaderSize)
+        return Err(Error("Ill-formed message header. Not enough data to read a header"));
 
     MessageHeader header;
     buffer >> header.size;
@@ -523,11 +522,19 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
 
     // Sanity checks:
     // It is a serious error if server responded with the message of a size bigger than negotiated one.
-    Solace::assertIndexInRange(header.size, 0, maxNegotiatedMessageSize());
+//    Solace::assertIndexInRange(header.size, headerSize(), maxNegotiatedMessageSize());
+    if (header.size < headerSize())
+        return Err(Error("Ill-formed message: Declared frame size less than header"));
+    if (header.size > maxNegotiatedMessageSize())
+        return Err(Error("Ill-formed message: Declared frame size greater than negotiated message size"));
+
     // don't want any funny messages.
-    Solace::assertIndexInRange(static_cast<byte>(header.type),
-                               static_cast<byte>(MessageType::TVersion),
-                               static_cast<byte>(MessageType::RWStat));
+//    Solace::assertIndexInRange(static_cast<byte>(header.type),
+//                               static_cast<byte>(MessageType::_beginSupportedMessageCode),
+//                               static_cast<byte>(MessageType::_endSupportedMessageCode));
+    if (header.type < MessageType::_beginSupportedMessageCode ||
+        header.type >= MessageType::_endSupportedMessageCode)
+        return Err(Error("Ill-formed message: Unsupported message type"));
 
     return Ok(header);
 }
@@ -554,15 +561,23 @@ P9Protocol::parseMessage(const MessageHeader& header, ByteBuffer& data) {
     default:
         Solace::raise<IOException>("Unsupported message type received");
         break;
-    };
+    }
 
     return Err(Error("Unexpected error"));
 }
 
 
+P9Protocol::size_type P9Protocol::maxNegotiatedMessageSize(size_type newMessageSize) noexcept {
+    Solace::assertIndexInRange(newMessageSize, 0, maxPossibleMessageSize());
+    _maxNegotiatedMessageSize = std::min(newMessageSize, maxPossibleMessageSize());
 
-P9Protocol::P9Protocol() :
-    _maxNegotiatedMessageSize(MAX_MESSAGE_SIZE),
+    return _maxNegotiatedMessageSize;
+}
+
+
+P9Protocol::P9Protocol(size_type maxMassageSize) :
+    _maxMassageSize(maxMassageSize),
+    _maxNegotiatedMessageSize(maxMassageSize),
     _currentTag(1)
 {
 
@@ -593,7 +608,7 @@ P9Protocol::Response::Response(MessageType msgType, Tag msgTag) :
     default:
         Solace::raise<IOException>("Unexpected message type");
         break;
-    };
+    }
 }
 
 
@@ -621,7 +636,7 @@ P9Protocol::Response::Response(Response&& rhs) :
     default:
         Solace::raise<IOException>("Unexpected message type");
         break;
-    };
+    }
 }
 
 
@@ -643,6 +658,6 @@ P9Protocol::Response::~Response() {
     case MessageType::RWStat:
     default:
         break;
-    };
+    }
 }
 

@@ -1,8 +1,20 @@
 
+# Project name
 export PROJECT = cadence
 
+# Compiler config:
+CXX ?= g++
+RANLIB ?= /bin/true
+
+ifeq (clang++, $(findstring clang++,$(CXX)))
+endif
+
+ifeq (g++, $(findstring g++,$(CXX)))
+	AR=gcc-ar
+endif
+
 # Project directory layout
-TARGET_DIR = lib
+TARGET_DIR = libs
 TARGET = $(TARGET_DIR)/lib$(PROJECT).a
 
 export PUBLIC_HEADERS = include
@@ -70,7 +82,9 @@ export LDFLAGS
 export LIBS
 
 
-all: $(PROJECT)
+$(PROJECT): $(TARGET)
+all: $(PROJECT) $(TEST_TAGRET) examples
+
 gen_proto: $(GEN_SRC_DIR) $(generated_src)
 
 #-------------------------------------------------------------------------------
@@ -103,9 +117,8 @@ $(BUILD_DIR)/%.o: %.cpp
 
 $(TARGET): $(obj)
 	@mkdir -p $(dir $@)
-	$(AR) -rcs $@ $^
-
-$(PROJECT): $(TARGET)
+	$(AR) rcs $@ $^
+	$(RANLIB) $@
 
 
 #-------------------------------------------------------------------------------
@@ -212,7 +225,7 @@ scan-build: ANALYZE_MAKE
 
 tidy:
 	clang-tidy -checks=llvm-*,modernize-*,clang-analyzer-*,-modernize-pass-by-value -header-filter=.* \
-	${SRC_DIR}/*.cpp -- -I${PUBLIC_HEADERS} -Ilibs/fmt/ -std=c++14
+	${SRC_DIR}/*.cpp -- -I$(PUBLIC_HEADERS) -std=c++14
 
 
 
@@ -243,7 +256,7 @@ $(COVERAGE_REPORT): $(BUILD_DIR)/build_coverage
 	# capture coverage info
 	lcov --directory . --capture --output-file $@
 	# filter out system and test code
-	lcov --remove coverage.info 'test/*' '/usr/*' 'libs/*' --output-file $@
+	lcov --remove coverage.info 'test/*' '/usr/*' 'external/*' --output-file $@
 
 coverage: $(COVERAGE_REPORT)
 

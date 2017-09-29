@@ -33,9 +33,22 @@ public:
     typedef Solace::uint16 Tag;
     typedef Solace::uint32 fid_type;
 
+    /**
+     * Maximum frame size that can transmitted by the protocol.
+     * (Note: server/client can negotiate actual frame size to be less then that.
+     */
+    static const size_type MAX_MESSAGE_SIZE;
+
+    /**
+     * String representing version of protocol.
+     */
+    static const Solace::String PROTOCOL_VERSION;
+
+    /**
+     * Special value of a message tag representing 'no tag'.
+     */
     static const Tag NO_TAG;
     static const fid_type NOFID;
-    static const Solace::String PROTOCOL_VERSION;
 
     enum Consts {
         MAX_WELEM = 16
@@ -43,6 +56,7 @@ public:
 
     /* 9P message types */
     enum class MessageType : Solace::byte {
+        _beginSupportedMessageCode = 100,
         TVersion = 100,
         RVersion,
         TAuth = 102,
@@ -71,6 +85,7 @@ public:
         RStat,
         TWStat = 126,
         RWStat,
+        _endSupportedMessageCode
     };
 
     /**
@@ -171,9 +186,7 @@ public:
 
 public:
 
-    virtual ~P9Protocol() = default;
-
-    P9Protocol();
+    explicit P9Protocol(size_type maxMassageSize = MAX_MESSAGE_SIZE);
 
     //---------------------------------------------------------
     // Create protocol requests
@@ -214,17 +227,17 @@ public:
                                fid_type fid, const Stat& stat);
 
 
-    size_type maxPossibleMessageSize() const noexcept;
+    size_type maxPossibleMessageSize() const noexcept {
+        return _maxMassageSize;
+    }
+
     size_type maxNegotiatedMessageSize() const noexcept {
         return _maxNegotiatedMessageSize;
     }
 
-    size_type maxNegotiatedMessageSize(size_type newMessageSize) noexcept {
-        _maxNegotiatedMessageSize = std::min(newMessageSize, maxPossibleMessageSize());
-        return _maxNegotiatedMessageSize;
-    }
+    size_type maxNegotiatedMessageSize(size_type newMessageSize) noexcept;
 
-    size_type headerSize() const noexcept {
+    static constexpr size_type headerSize() noexcept {
         // Note: can't use sizeof(MessageHeader) due to padding
         return  sizeof(MessageHeader::size) +
                 sizeof(MessageHeader::type) +
@@ -236,8 +249,11 @@ public:
 
     Solace::Result<Response, Solace::Error> parseMessage(const MessageHeader& header, Solace::ByteBuffer& data);
 
-//    fid_type allocateFid();
-//    Tag nextTag();
+    /**
+     * FIXME: Need to re-work
+     * @return
+     */
+    fid_type allocateFid();
 
 protected:
 
@@ -260,6 +276,7 @@ protected:
 
 private:
 
+    size_type   _maxMassageSize;
     size_type   _maxNegotiatedMessageSize;
     Tag    _currentTag;
 };

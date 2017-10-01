@@ -365,30 +365,28 @@ P9Protocol::createWriteStatRequest(Tag tag, Solace::ByteBuffer& dest,
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseErrorResponse(const MessageHeader& SOLACE_UNUSED(header), ByteBuffer& buffer) {
+P9Protocol::parseErrorResponse(const MessageHeader& SOLACE_UNUSED(header), ByteBuffer& buffer) const {
     return Err(Error(readString(buffer).to_str()));
 }
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseVersionResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseVersionResponse(const MessageHeader& header, ByteBuffer& data) const {
     uint32 newMaxMessageSize = 0;
     data >> newMaxMessageSize;
 
     Response fcall(header.type, header.tag);
 
+    fcall.version.msize = newMaxMessageSize;
     // FIXME: As wrong as it gets!
     fcall.version.version = readString(data);
-
-    maxNegotiatedMessageSize(newMaxMessageSize);
-
 
     return Ok(std::move(fcall));
 }
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseAuthResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseAuthResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     readQid(data, &fcall.auth.qid);
@@ -398,7 +396,7 @@ P9Protocol::parseAuthResponse(const MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseAttachResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseAttachResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     readQid(data, &fcall.attach.qid);
@@ -408,7 +406,7 @@ P9Protocol::parseAttachResponse(const MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseClunkResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) {
+P9Protocol::parseClunkResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) const {
     Response fcall(header.type, header.tag);
 
     return Ok(std::move(fcall));
@@ -416,7 +414,7 @@ P9Protocol::parseClunkResponse(const MessageHeader& header, ByteBuffer& SOLACE_U
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseFlushResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) {
+P9Protocol::parseFlushResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) const {
     Response fcall(header.type, header.tag);
 
     return Ok(std::move(fcall));
@@ -424,7 +422,7 @@ P9Protocol::parseFlushResponse(const MessageHeader& header, ByteBuffer& SOLACE_U
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseOpenResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseOpenResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     readQid(data, &fcall.open.qid);
@@ -435,7 +433,7 @@ P9Protocol::parseOpenResponse(const MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseCreateResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseCreateResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     readQid(data, &fcall.create.qid);
@@ -446,7 +444,7 @@ P9Protocol::parseCreateResponse(const MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseReadResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseReadResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     uint32 bytesRead;
@@ -458,7 +456,7 @@ P9Protocol::parseReadResponse(const MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseWriteResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseWriteResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     data >> fcall.write.count;
@@ -468,7 +466,7 @@ P9Protocol::parseWriteResponse(const MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseRemoveResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) {
+P9Protocol::parseRemoveResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) const {
     Response fcall(header.type, header.tag);
 
     return Ok(std::move(fcall));
@@ -476,7 +474,7 @@ P9Protocol::parseRemoveResponse(const MessageHeader& header, ByteBuffer& SOLACE_
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseStatResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseStatResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     readStat(data, &(fcall.stat));
@@ -486,7 +484,7 @@ P9Protocol::parseStatResponse(const MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseWStatResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) {
+P9Protocol::parseWStatResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) const {
     Response fcall(header.type, header.tag);
 
     return Ok(std::move(fcall));
@@ -494,7 +492,7 @@ P9Protocol::parseWStatResponse(const MessageHeader& header, ByteBuffer& SOLACE_U
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseWalkResponse(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseWalkResponse(const MessageHeader& header, ByteBuffer& data) const {
     Response fcall(header.type, header.tag);
 
     data >> fcall.walk.nqids;
@@ -517,8 +515,6 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
 
     MessageHeader header;
     buffer >> header.size;
-    buffer.read(reinterpret_cast<byte*>(&header.type), sizeof(header.type));
-    buffer >> header.tag;
 
     // Sanity checks:
     // It is a serious error if server responded with the message of a size bigger than negotiated one.
@@ -528,42 +524,57 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
     if (header.size > maxNegotiatedMessageSize())
         return Err(Error("Ill-formed message: Declared frame size greater than negotiated message size"));
 
+    // Read message type:
+    byte messageBytecode;
+    buffer >> messageBytecode;
     // don't want any funny messages.
-//    Solace::assertIndexInRange(static_cast<byte>(header.type),
+//    Solace::assertIndexInRange(messageBytecode,
 //                               static_cast<byte>(MessageType::_beginSupportedMessageCode),
 //                               static_cast<byte>(MessageType::_endSupportedMessageCode));
+    header.type = static_cast<MessageType>(messageBytecode);
     if (header.type < MessageType::_beginSupportedMessageCode ||
         header.type >= MessageType::_endSupportedMessageCode)
         return Err(Error("Ill-formed message: Unsupported message type"));
+
+    // Read message tag. Tags are provided by the client and can not be checked by the message parser.
+    // Unless we are provided with the expected tag...
+    buffer >> header.tag;
 
     return Ok(header);
 }
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseMessage(const MessageHeader& header, ByteBuffer& data) {
+P9Protocol::parseMessage(const MessageHeader& header, ByteBuffer& data) const {
+    const auto expectedData = header.size - headerSize();
+
+    // Message data sanity check
+    // Make sure we have been given enough data to read a message as requested in the message size.
+    if (expectedData > data.remaining())
+        return Err(Error("Ill-formed message: Declared frame size larger than message data received"));
+
+    // Make sure there is no extra data in the buffer.
+    if (expectedData < data.remaining())
+        return Err(Error("Ill-formed message: Declared frame size less than message data received"));
 
     switch (header.type) {
-    case MessageType::RError:   return parseErrorResponse(header, data);
+    case MessageType::RError:   return parseErrorResponse(header,   data);
     case MessageType::RVersion: return parseVersionResponse(header, data);
-    case MessageType::RAuth:    return parseAuthResponse(header, data);
-    case MessageType::RAttach:  return parseAttachResponse(header, data);
-    case MessageType::RFlush:   return parseFlushResponse(header, data);
-    case MessageType::RWalk:    return parseWalkResponse(header, data);
-    case MessageType::ROpen:    return parseOpenResponse(header, data);
-    case MessageType::RCreate:  return parseCreateResponse(header, data);
-    case MessageType::RRead:    return parseReadResponse(header, data);
-    case MessageType::RWrite:   return parseWriteResponse(header, data);
-    case MessageType::RClunk:   return parseClunkResponse(header, data);
-    case MessageType::RRemove:  return parseRemoveResponse(header, data);
-    case MessageType::RStat:    return parseStatResponse(header, data);
-    case MessageType::RWStat:   return parseWStatResponse(header, data);
+    case MessageType::RAuth:    return parseAuthResponse(header,    data);
+    case MessageType::RAttach:  return parseAttachResponse(header,  data);
+    case MessageType::RFlush:   return parseFlushResponse(header,   data);
+    case MessageType::RWalk:    return parseWalkResponse(header,    data);
+    case MessageType::ROpen:    return parseOpenResponse(header,    data);
+    case MessageType::RCreate:  return parseCreateResponse(header,  data);
+    case MessageType::RRead:    return parseReadResponse(header,    data);
+    case MessageType::RWrite:   return parseWriteResponse(header,   data);
+    case MessageType::RClunk:   return parseClunkResponse(header,   data);
+    case MessageType::RRemove:  return parseRemoveResponse(header,  data);
+    case MessageType::RStat:    return parseStatResponse(header,    data);
+    case MessageType::RWStat:   return parseWStatResponse(header,   data);
     default:
-        Solace::raise<IOException>("Unsupported message type received");
-        break;
+        return Err(Error("Failed to parse responce message: Unsupported message type"));
     }
-
-    return Err(Error("Unexpected error"));
 }
 
 
@@ -589,16 +600,16 @@ P9Protocol::Response::Response(MessageType msgType, Tag msgTag) :
     tag(msgTag)
 {
     switch (type) {
-    case MessageType::RError:   new (&error) Error; return;
+    case MessageType::RError:   new (&error) Error;     return;
     case MessageType::RVersion: new (&version) Version; return;
-    case MessageType::RAuth:    new (&auth) Auth; return;
-    case MessageType::RAttach:  new (&attach) Attach; return;
-    case MessageType::RWalk:    new (&walk) Walk; return;
-    case MessageType::ROpen:    new (&open) Open; return;
-    case MessageType::RCreate:  new (&create) Create; return;
-    case MessageType::RRead:    new (&read) Read; return;
-    case MessageType::RWrite:   new (&write) Write; return;
-    case MessageType::RStat:    new (&stat) Stat; return;
+    case MessageType::RAuth:    new (&auth) Auth;       return;
+    case MessageType::RAttach:  new (&attach) Attach;   return;
+    case MessageType::RWalk:    new (&walk) Walk;       return;
+    case MessageType::ROpen:    new (&open) Open;       return;
+    case MessageType::RCreate:  new (&create) Create;   return;
+    case MessageType::RRead:    new (&read) Read;       return;
+    case MessageType::RWrite:   new (&write) Write;     return;
+    case MessageType::RStat:    new (&stat) Stat;       return;
     case MessageType::RClunk:
     case MessageType::RRemove:
     case MessageType::RFlush:
@@ -642,16 +653,16 @@ P9Protocol::Response::Response(Response&& rhs) :
 
 P9Protocol::Response::~Response() {
     switch (type) {
-    case MessageType::RError:   (&error)->~Error();  return;
-    case MessageType::RVersion: (&version)->~Version(); return;
-    case MessageType::RAuth:    (&auth)->~Auth(); return;
-    case MessageType::RAttach:  (&attach)->~Attach(); return;
-    case MessageType::RWalk:    (&walk)->~Walk(); return;
-    case MessageType::ROpen:    (&open)->~Open(); return;
-    case MessageType::RCreate:  (&create)->~Create(); return;
-    case MessageType::RRead:    (&read)->~Read(); return;
-    case MessageType::RWrite:   (&write)->~Write(); return;
-    case MessageType::RStat:    (&stat)->~Stat(); return;
+    case MessageType::RError:   (&error)->~Error();     break;
+    case MessageType::RVersion: (&version)->~Version(); break;
+    case MessageType::RAuth:    (&auth)->~Auth();       break;
+    case MessageType::RAttach:  (&attach)->~Attach();   break;
+    case MessageType::RWalk:    (&walk)->~Walk();       break;
+    case MessageType::ROpen:    (&open)->~Open();       break;
+    case MessageType::RCreate:  (&create)->~Create();   break;
+    case MessageType::RRead:    (&read)->~Read();       break;
+    case MessageType::RWrite:   (&write)->~Write();     break;
+    case MessageType::RStat:    (&stat)->~Stat();       break;
     case MessageType::RClunk:
     case MessageType::RRemove:
     case MessageType::RFlush:

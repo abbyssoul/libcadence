@@ -27,8 +27,26 @@ inline uint16 operator "" _us(unsigned long long value) {  // NOLINT(runtime/int
     return static_cast<uint16>(value);
 }
 
+void writeStat(ByteBuffer& dest, const P9Protocol::Stat& stat);
 
 namespace cadence {
+
+    bool operator == (const P9Protocol::Stat& lhs, const P9Protocol::Stat& rhs) {
+        return (lhs.atime == rhs.atime &&
+                lhs.dev == rhs.dev &&
+                lhs.gid == rhs.gid &&
+                lhs.length == rhs.length &&
+                lhs.mode == rhs.mode &&
+                lhs.mtime == rhs.mtime &&
+                lhs.name == rhs.name &&
+                lhs.qid.path == rhs.qid.path &&
+                lhs.qid.version == rhs.qid.version &&
+                lhs.qid.type == rhs.qid.type &&
+                lhs.size == rhs.size &&
+                lhs.type == rhs.type &&
+                lhs.uid == rhs.uid);
+    }
+
     std::ostream& operator<< (std::ostream& ostr, P9Protocol::MessageType t) {
 
         switch (t) {
@@ -107,6 +125,21 @@ TEST(P9p2000x, testParsingMessageHeader) {
     ASSERT_EQ(1_us, header.tag);
 }
 
+
+TEST(P9p2000x, parsingMessageHeaderWithUnknownMessageType) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    // Form a normal message with no data:
+    ByteBuffer buffer(_mem.create(512));
+    buffer << P9Protocol::size_type(4 + 1 + 2);
+    buffer << static_cast<byte>(-1);
+    buffer << P9Protocol::Tag(1);
+
+    ASSERT_TRUE(proc.parseMessageHeader(buffer.flip()).isError());
+//    ASSERT_ANY_THROW(proc.parseMessageHeader(buffer.flip()));
+}
+
 TEST(P9p2000x, testParsingHeaderWithInsufficientData) {
     MemoryManager _mem(1024);
     P9Protocol proc;
@@ -122,7 +155,6 @@ TEST(P9p2000x, testParsingHeaderWithInsufficientData) {
 
 TEST(P9p2000x, testParsingIllformedMessageHeader) {
     MemoryManager _mem(1024);
-    P9Protocol proc;
 
     ByteBuffer buffer(_mem.create(512));
     // Set declared message size less then header size.
@@ -130,11 +162,11 @@ TEST(P9p2000x, testParsingIllformedMessageHeader) {
     buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
     buffer << P9Protocol::Tag(1);
 
-    auto res = proc.parseMessageHeader(buffer.flip());
-    ASSERT_TRUE(res.isError());
+    P9Protocol proc;
+    ASSERT_TRUE(proc.parseMessageHeader(buffer.flip()).isError());
 }
 
-TEST(P9p2000x, testParsingIllformedHeaderForMessagesLargerMTU) {
+TEST(P9p2000x, parsingIllFormedHeaderForMessagesLargerMTUShouldError) {
     MemoryManager _mem(1024);
     P9Protocol proc;
 
@@ -145,8 +177,378 @@ TEST(P9p2000x, testParsingIllformedHeaderForMessagesLargerMTU) {
     buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
     buffer << P9Protocol::Tag(1);
 
-    auto res = proc.parseMessageHeader(buffer.flip());
-    ASSERT_TRUE(res.isError());
+    ASSERT_TRUE(proc.parseMessageHeader(buffer.flip()).isError());
+}
+
+
+TEST(P9p2000x, parseIncorrectlySizedSmallerResponse) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    ByteBuffer buffer(_mem.create(512));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(proc.headerSize() + sizeof(int32));
+    buffer << static_cast<byte>(P9Protocol::MessageType::RVersion);
+    buffer << P9Protocol::Tag(1);
+    buffer << byte(3);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isError());
+}
+
+TEST(P9p2000x, parseIncorrectlySizedLargerResponse) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    ByteBuffer buffer(_mem.create(proc.headerSize() + sizeof(int32)*2));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(proc.headerSize() + sizeof(int32));
+    buffer << static_cast<byte>(P9Protocol::MessageType::RVersion);
+    buffer << P9Protocol::Tag(1);
+    buffer << int64(999999);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isError());
+}
+
+TEST(P9p2000x, parseVersionRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize() + sizeof(int32) + sizeof(int16) + 2;
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RVersion);
+    buffer << P9Protocol::Tag(1);
+    buffer << int32(512);
+    buffer << int16(2);
+    buffer.write("9P", 2);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+
+    ASSERT_EQ(512, response.version.msize);
+    ASSERT_STREQ("9P", response.version.version.c_str());
+}
+
+TEST(P9p2000x, parseAuthRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize() + 13;
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RAuth);
+    buffer << P9Protocol::Tag(1);
+
+    buffer << byte(13);     // QID.type
+    buffer << uint32(91);   // QID.version
+    buffer << uint64(441);  // QID.path
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(13, response.auth.qid.type);
+    EXPECT_EQ(91, response.auth.qid.version);
+    EXPECT_EQ(441, response.auth.qid.path);
+}
+
+TEST(P9p2000x, parseErrorRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const char* expectedErrorMessage = "All good!";
+    const uint16 messageLen = static_cast<uint16>(strlen(expectedErrorMessage));
+    const auto messageSize = proc.headerSize() + sizeof(uint16) + messageLen;
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RError);
+    buffer << P9Protocol::Tag(1);
+
+    buffer << messageLen;
+    buffer.write(expectedErrorMessage, messageLen);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isError());
+
+    auto response = message.moveError();
+    EXPECT_STREQ(expectedErrorMessage, response.toString().c_str());
+//    EXPECT_STREQ(expectedErrorMessage, response.error.ename.c_str());
+}
+
+
+TEST(P9p2000x, parseFlushRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize();
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RFlush);
+    buffer << P9Protocol::Tag(1);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+}
+
+TEST(P9p2000x, parseAttachRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize() + 13;
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RAttach);
+    buffer << P9Protocol::Tag(1);
+
+    buffer << byte(81);     // QID.type
+    buffer << uint32(3);   // QID.version
+    buffer << uint64(1049);  // QID.path
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(81, response.attach.qid.type);
+    EXPECT_EQ(3, response.attach.qid.version);
+    EXPECT_EQ(1049, response.attach.qid.path);
+}
+
+TEST(P9p2000x, parseOpenRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize() + 13 + sizeof(uint32);
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::ROpen);
+    buffer << P9Protocol::Tag(1);
+    // qid
+    buffer << byte(71);     // QID.type
+    buffer << uint32(33);   // QID.version
+    buffer << uint64(4173);  // QID.path
+    // iounit
+    buffer << uint32(998);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(71, response.open.qid.type);
+    EXPECT_EQ(33, response.open.qid.version);
+    EXPECT_EQ(4173, response.open.qid.path);
+    EXPECT_EQ(998, response.open.iounit);
+}
+
+TEST(P9p2000x, parseCreateRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize() + 13 + sizeof(uint32);
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RCreate);
+    buffer << P9Protocol::Tag(1);
+    // qid
+    buffer << byte(87);     // QID.type
+    buffer << uint32(5481);   // QID.version
+    buffer << uint64(17);  // QID.path
+    // iounit
+    buffer << uint32(778);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(87, response.create.qid.type);
+    EXPECT_EQ(5481, response.create.qid.version);
+    EXPECT_EQ(17, response.create.qid.path);
+    EXPECT_EQ(778, response.create.iounit);
+}
+
+TEST(P9p2000x, parseReadRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const char* messageData = "This is a very important data d-_^b";
+    const uint32 dataLen = static_cast<uint32>(strlen(messageData));
+    const auto messageSize = proc.headerSize() + sizeof(uint32) + dataLen;
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RRead);
+    buffer << P9Protocol::Tag(1);
+    // iounit
+    buffer << dataLen;
+    buffer.write(messageData, dataLen);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(dataLen, response.read.data.size());
+    EXPECT_TRUE(memcmp(response.read.data.dataAddress(), messageData, dataLen) == 0);
+}
+
+
+TEST(P9p2000x, parseWriteRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize() + sizeof(uint32);
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RWrite);
+    buffer << P9Protocol::Tag(1);
+    // iounit
+    buffer << uint32(81177);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(81177, response.write.count);
+}
+
+
+TEST(P9p2000x, parseClunkRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize();
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RClunk);
+    buffer << P9Protocol::Tag(1);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+}
+
+TEST(P9p2000x, parseRemoveRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize();
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RRemove);
+    buffer << P9Protocol::Tag(1);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+}
+
+TEST(P9p2000x, parseStatRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize() + 512;
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    const auto headPosition = buffer.position();
+    buffer << P9Protocol::size_type(0);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RStat);
+    buffer << P9Protocol::Tag(1);
+
+    P9Protocol::Stat stat;
+    stat.atime = 21;
+    stat.dev = 8828;
+    stat.gid = "Some user";
+    stat.length = 818177;
+    stat.mode = 111;
+    stat.mtime = 17;
+    stat.name = "File McFileface";
+    stat.qid.path = 61;
+    stat.qid.type = 15;
+    stat.qid.version = 404;
+    stat.size = 124;
+    stat.type = 1;
+    stat.uid = "User McUserface";
+
+    writeStat(buffer, stat);
+    const auto totalSize = buffer.position();
+    buffer.reset(headPosition) << P9Protocol::size_type(totalSize);
+    buffer.reset(totalSize);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(stat, response.stat);
+}
+
+TEST(P9p2000x, parseWStatRespose) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
+
+    const auto messageSize = proc.headerSize();
+    ByteBuffer buffer(_mem.create(messageSize));
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(messageSize);
+    buffer << static_cast<byte>(P9Protocol::MessageType::RWStat);
+    buffer << P9Protocol::Tag(1);
+
+    auto header = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(header.isOk());
+
+    auto message = proc.parseMessage(header.unwrap(), buffer);
+    ASSERT_TRUE(message.isOk());
 }
 
 
@@ -162,4 +564,3 @@ TEST(P9p2000x, createVersionRequest) {
 
     ASSERT_EQ(proc.headerSize() + 4 + 2 + versionStringLen, buffer.position());
 }
-

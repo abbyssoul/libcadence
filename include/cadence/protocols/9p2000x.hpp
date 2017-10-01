@@ -102,7 +102,7 @@ public:
         Solace::uint16  size;
         Solace::uint16  type;
         Solace::uint32 	dev;
-        Qid	qid;
+        Qid             qid;
         Solace::uint32	mode;
         Solace::uint32	atime;
         Solace::uint32	mtime;
@@ -165,16 +165,16 @@ public:
         MessageType type;
         Tag         tag;
         union {
-            Write write;
-            Version version;
-            Error error;
-            Auth auth;
-            Attach attach;
-            Walk walk;
-            Open open;
-            Create create;
-            Read read;
-            Stat  stat;
+            Write       write;
+            Version     version;
+            Error       error;
+            Auth        auth;
+            Attach      attach;
+            Walk        walk;
+            Open        open;
+            Create      create;
+            Read        read;
+            Stat        stat;
         };
 
         Response(MessageType rtype, Tag tag);
@@ -247,7 +247,8 @@ public:
     Solace::Result<MessageHeader, Solace::Error>
     parseMessageHeader(Solace::ByteBuffer& buffer) const;
 
-    Solace::Result<Response, Solace::Error> parseMessage(const MessageHeader& header, Solace::ByteBuffer& data);
+    Solace::Result<Response, Solace::Error>
+    parseMessage(const MessageHeader& header, Solace::ByteBuffer& data) const;
 
     /**
      * FIXME: Need to re-work
@@ -257,22 +258,47 @@ public:
 
 protected:
 
-    Solace::Result<Response, Solace::Error> parseErrorResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseVersionResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseAuthResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseAttachResponse(const MessageHeader& header, Solace::ByteBuffer& data);
+    Solace::Result<Response, Solace::Error>
+    parseErrorResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
 
-    Solace::Result<Response, Solace::Error> parseClunkResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseFlushResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseOpenResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseCreateResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseReadResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseWriteResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseRemoveResponse(const MessageHeader& header, Solace::ByteBuffer& data);
+    Solace::Result<Response, Solace::Error>
+    parseVersionResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
 
-    Solace::Result<Response, Solace::Error> parseStatResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseWStatResponse(const MessageHeader& header, Solace::ByteBuffer& data);
-    Solace::Result<Response, Solace::Error> parseWalkResponse(const MessageHeader& header, Solace::ByteBuffer& data);
+    Solace::Result<Response, Solace::Error>
+    parseAuthResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseAttachResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseClunkResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseFlushResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseOpenResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseCreateResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseReadResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseWriteResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseRemoveResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseStatResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseWStatResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+
+    Solace::Result<Response, Solace::Error>
+    parseWalkResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
 
 private:
 

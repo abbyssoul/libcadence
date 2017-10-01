@@ -15,46 +15,32 @@
  *******************************************************************************/
 #include <cadence/async/event.hpp>  // Class being tested
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
+
 
 using namespace Solace;
 using namespace cadence::async;
 
 
-class TestAsyncEvent : public CppUnit::TestFixture {
+TEST(TestAsyncEvent, subscription) {
+    EventLoop iocontext;
+    Event event(iocontext);
 
-	CPPUNIT_TEST_SUITE(TestAsyncEvent);
-        CPPUNIT_TEST(testSubscription);
-	CPPUNIT_TEST_SUITE_END();
+    bool eventWasCalled = false;
 
-protected:
-public:
+    event.asyncWait().then([&eventWasCalled, &iocontext]() {
+        eventWasCalled = true;
+    });
 
-	void testSubscription() {
-        EventLoop iocontext;
-        Event event(iocontext);
+    asio::thread t([&iocontext]() {
+        using namespace std::chrono_literals;
+        iocontext.run();
 
-        bool eventWasCalled = false;
+        std::this_thread::sleep_for(200ms);
+    });
+    event.notify();
 
-        event.asyncWait().then([&eventWasCalled, &iocontext]() {
-            eventWasCalled = true;
-        });
+    t.join();
 
-        asio::thread t([&iocontext]() {
-            using namespace std::chrono_literals;
-            iocontext.run();
-
-            std::this_thread::sleep_for(200ms);
-
-
-        });
-        event.notify();
-
-        t.join();
-
-        CPPUNIT_ASSERT(eventWasCalled);
-    }
-
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAsyncEvent);
+    ASSERT_TRUE(eventWasCalled);
+}

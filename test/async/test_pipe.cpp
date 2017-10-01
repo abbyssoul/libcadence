@@ -15,113 +15,99 @@
  *******************************************************************************/
 #include <cadence/async/pipe.hpp>  // Class being tested
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
+
 
 using namespace Solace;
 using namespace cadence::async;
 
-class TestAsyncPipe: public CppUnit::TestFixture {
+TEST(TestAsyncPipe, testAsyncWrite) {
+    EventLoop iocontext;
+    Pipe iopipe(iocontext);
 
-	CPPUNIT_TEST_SUITE(TestAsyncPipe);
-		CPPUNIT_TEST(testAsyncWrite);
-		CPPUNIT_TEST(testAsyncRead);
-		CPPUNIT_TEST(testAsyncReadWrite);
-	CPPUNIT_TEST_SUITE_END();
+    char message[] = "Hello there!";
+    const ByteBuffer::size_type messageLen = strlen(message) + 1;
+    auto buffer = ByteBuffer(wrapMemory(message));
 
-protected:
-public:
+    bool writeComplete = false;
 
-	void testAsyncWrite() {
-        EventLoop iocontext;
-        Pipe iopipe(iocontext);
+    iopipe.asyncWrite(buffer).then([&writeComplete]() {
+        writeComplete = true;
+    });
 
-        char message[] = "Hello there!";
-        const ByteBuffer::size_type messageLen = strlen(message) + 1;
-        auto buffer = ByteBuffer(wrapMemory(message));
+    iocontext.runFor(300);
 
-        bool writeComplete = false;
-
-        CPPUNIT_ASSERT(!writeComplete);
-        iopipe.asyncWrite(buffer).then([&writeComplete]() {
-            writeComplete = true;
-        });
-
-        iocontext.runFor(300);
-
-        CPPUNIT_ASSERT(writeComplete);
-        CPPUNIT_ASSERT_EQUAL(messageLen, buffer.position());
-    }
+    ASSERT_TRUE(writeComplete);
+    ASSERT_EQ(messageLen, buffer.position());
+}
 
 
-	void testAsyncRead() {
-        EventLoop iocontext;
-        Pipe iopipe(iocontext);
+TEST(TestAsyncPipe, testAsyncRead) {
+    EventLoop iocontext;
+    Pipe iopipe(iocontext);
 
-        char message[] = "Hello there!";
-        const ByteBuffer::size_type messageLen = strlen(message) + 1;
-        auto messageBuffer = ByteBuffer(wrapMemory(message));
+    char message[] = "Hello there!";
+    const ByteBuffer::size_type messageLen = strlen(message) + 1;
+    auto messageBuffer = ByteBuffer(wrapMemory(message));
 
-        char rcv_buffer[128];
-        auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    char rcv_buffer[128];
+    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
 
-        bool readComplete = false;
-        bool writeComplete = false;
+    bool readComplete = false;
+    bool writeComplete = false;
 
-        iopipe.asyncWrite(messageBuffer).then([&writeComplete]() {
-            writeComplete = true;
-        });
+    iopipe.asyncWrite(messageBuffer).then([&writeComplete]() {
+        writeComplete = true;
+    });
 
-        iopipe.asyncRead(readBuffer).then([&readComplete]() {
-            readComplete = true;
-        });
+    iopipe.asyncRead(readBuffer).then([&readComplete]() {
+        readComplete = true;
+    });
 
-        iocontext.runFor(300);
+    iocontext.runFor(300);
 
-        CPPUNIT_ASSERT_EQUAL(true, writeComplete);
-        CPPUNIT_ASSERT_EQUAL(true, readComplete);
+    ASSERT_TRUE(writeComplete);
+    ASSERT_TRUE(readComplete);
 
-        // Check that we read as much as was written
-        CPPUNIT_ASSERT_EQUAL(false, messageBuffer.hasRemaining());
-        CPPUNIT_ASSERT_EQUAL(messageLen, messageBuffer.position());
+    // Check that we read as much as was written
+    ASSERT_FALSE(messageBuffer.hasRemaining());
+    ASSERT_EQ(messageLen, messageBuffer.position());
 
-        CPPUNIT_ASSERT_EQUAL(messageLen, readBuffer.position());
-    }
+    ASSERT_EQ(messageLen, readBuffer.position());
+}
 
-	void testAsyncReadWrite() {
-        EventLoop iocontext;
-        Pipe iopipe(iocontext);
+TEST(TestAsyncPipe, testAsyncReadWrite) {
+    EventLoop iocontext;
+    Pipe iopipe(iocontext);
 
-        char message[] = "Hello there!";
-        const ByteBuffer::size_type messageLen = strlen(message) + 1;
-        auto messageBuffer = ByteBuffer(wrapMemory(message));
+    char message[] = "Hello there!";
+    const ByteBuffer::size_type messageLen = strlen(message) + 1;
+    auto messageBuffer = ByteBuffer(wrapMemory(message));
 
-        char rcv_buffer[128];
-        auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    char rcv_buffer[128];
+    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
 
-        bool readComplete = false;
-        bool writeComplete = false;
+    bool readComplete = false;
+    bool writeComplete = false;
 
-        iopipe.asyncRead(readBuffer).then([&readComplete, &iocontext]() {
-            readComplete = true;
-        });
+    iopipe.asyncRead(readBuffer).then([&readComplete, &iocontext]() {
+        readComplete = true;
+    });
 
 
-        iopipe.asyncWrite(messageBuffer).then([&writeComplete]() {
-            writeComplete = true;
-        });
+    iopipe.asyncWrite(messageBuffer).then([&writeComplete]() {
+        writeComplete = true;
+    });
 
-        iocontext.runFor(300);
+    iocontext.runFor(300);
 
-        // Check that we have read something
-        CPPUNIT_ASSERT_EQUAL(true, writeComplete);
-        CPPUNIT_ASSERT_EQUAL(true, readComplete);
+    // Check that we have read something
+    ASSERT_TRUE(writeComplete);
+    ASSERT_TRUE(readComplete);
 
-        // Check that we read as much as was written
-        CPPUNIT_ASSERT_EQUAL(false, messageBuffer.hasRemaining());
-        CPPUNIT_ASSERT_EQUAL(messageLen, messageBuffer.position());
+    // Check that we read as much as was written
+    ASSERT_FALSE(messageBuffer.hasRemaining());
+    ASSERT_EQ(messageLen, messageBuffer.position());
 
-        CPPUNIT_ASSERT_EQUAL(messageLen, readBuffer.position());
-    }
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAsyncPipe);
+    ASSERT_EQ(messageLen, readBuffer.position());
+}

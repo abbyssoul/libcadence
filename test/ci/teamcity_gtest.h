@@ -16,7 +16,7 @@
 
 #ifndef H_TEAMCITY_GTEST
 #define H_TEAMCITY_GTEST
-/*
+
 #include <gtest/gtest.h>
 #include <string>
 
@@ -50,5 +50,5 @@ private:
 
 }
 }
-*/
-#endif /* H_TEAMCITY_GTEST */
+
+#endif  /* H_TEAMCITY_GTEST */

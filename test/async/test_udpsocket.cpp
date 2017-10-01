@@ -15,7 +15,7 @@
  *******************************************************************************/
 #include <cadence/async/udpsocket.hpp>  // Class being tested
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 #include <unistd.h>
 
@@ -23,57 +23,43 @@ using namespace Solace;
 using namespace cadence::async;
 
 
-class TestUdpSocket: public CppUnit::TestFixture {
+TEST(TestUdpSocket, testAsyncReadWrite) {
+    EventLoop iocontext;
+    UdpSocket udpServerSocket(iocontext, 20000);
+    UdpSocket udpClientSocket(iocontext, 20001);
 
-	CPPUNIT_TEST_SUITE(TestUdpSocket);
-		CPPUNIT_TEST(testAsyncReadWrite);
-	CPPUNIT_TEST_SUITE_END();
+    char message[] = "Hello there!";
+    const ByteBuffer::size_type messageLen = strlen(message) + 1;
 
-protected:
-public:
-	void testAsyncReadWrite() {
-        EventLoop iocontext;
-        UdpSocket udpServerSocket(iocontext, 20000);
-        UdpSocket udpClientSocket(iocontext, 20001);
+    auto messageBuffer = ByteBuffer(wrapMemory(message));
 
-        char message[] = "Hello there!";
-        const ByteBuffer::size_type messageLen = strlen(message) + 1;
+    char rcv_buffer[128];
+    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
 
-        auto messageBuffer = ByteBuffer(wrapMemory(message));
+    bool readComplete = false;
+    bool writeComplete = false;
 
-        char rcv_buffer[128];
-        auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    UdpSocketReceiver receiver("localhost", "20001");
+    udpServerSocket.asyncWrite(messageBuffer, receiver).then([&writeComplete]() {
+        writeComplete = true;
+    });
 
-        bool readComplete = false;
-        bool writeComplete = false;
+    // udpServerSocket.asyncWrite(messageBuffer, "localhost", "20001").then([&writeComplete]() {
+    // 	writeComplete = true;
+    // });
 
-        UdpSocketReceiver receiver("localhost", "20001");
-        udpServerSocket.asyncWrite(messageBuffer, receiver).then([&writeComplete]() {
-            writeComplete = true;
-        });
+    udpClientSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
+        readComplete = true;
+    });
 
-        // udpServerSocket.asyncWrite(messageBuffer, "localhost", "20001").then([&writeComplete]() {
-        // 	writeComplete = true;
-        // });
+    iocontext.runFor(300);
 
-        udpClientSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
-            readComplete = true;
-        });
+    // Check that we have read something
+    ASSERT_TRUE(writeComplete);
+    ASSERT_TRUE(readComplete);
 
-        iocontext.runFor(300);
-
-        CPPUNIT_ASSERT(readComplete);
-        CPPUNIT_ASSERT(writeComplete);
-
-        // Check that we have read something
-        CPPUNIT_ASSERT_EQUAL(true, writeComplete);
-        CPPUNIT_ASSERT_EQUAL(true, readComplete);
-
-        // Check that we read as much as was written
-        CPPUNIT_ASSERT_EQUAL(false, messageBuffer.hasRemaining());
-        CPPUNIT_ASSERT_EQUAL(messageLen, messageBuffer.position());
-        CPPUNIT_ASSERT_EQUAL(messageLen, readBuffer.position());
-    }
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestUdpSocket);
+    // Check that we read as much as was written
+    ASSERT_FALSE(messageBuffer.hasRemaining());
+    ASSERT_EQ(messageLen, messageBuffer.position());
+    ASSERT_EQ(messageLen, readBuffer.position());
+}

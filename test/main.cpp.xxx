@@ -41,7 +41,7 @@
 #include <memory>
 
 
-#include "ci/teamcity_cppunit.h"
+#include "ci/teamcity_cppunit.h.xxx"
 #include "interruptexception.hpp"
 
 

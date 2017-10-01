@@ -15,7 +15,8 @@
 #include <cadence/protocols/9p2000x.hpp>  // Class being tested
 
 #include <solace/exception.hpp>
-#include <cppunit/extensions/HelperMacros.h>
+
+#include "gtest/gtest.h"
 
 
 using namespace Solace;
@@ -68,131 +69,97 @@ namespace cadence {
 }  // end of namespace cadence
 
 
-class Test9p2000x : public CppUnit::TestFixture {
+TEST(P9p2000x, testHeaderSize) {
+    P9Protocol proc;
 
-    CPPUNIT_TEST_SUITE(Test9p2000x);
-        CPPUNIT_TEST(testHeaderSize);
-        CPPUNIT_TEST(testSettingFrameSize);
-        CPPUNIT_TEST(testParsingMessageHeader);
-        CPPUNIT_TEST(testParsingHeaderWithInsufficientData);
-        CPPUNIT_TEST(testParsingIllformedMessageHeader);
-        CPPUNIT_TEST(testParsingIllformedHeaderForMessagesLargerMTU);
-        CPPUNIT_TEST(createVersionRequest);
-    CPPUNIT_TEST_SUITE_END();
+    ASSERT_EQ(4u + 1u + 2u, proc.headerSize());
+}
 
-protected:
-public:
+TEST(P9p2000x, testSettingFrameSize) {
+    P9Protocol proc(127);
 
-    void setUp() override {
-    }
+    ASSERT_EQ(127u, proc.maxPossibleMessageSize());
+    ASSERT_EQ(127u, proc.maxNegotiatedMessageSize());
 
-    void tearDown() override {
-    }
+    proc.maxNegotiatedMessageSize(56);
+    ASSERT_EQ(127u, proc.maxPossibleMessageSize());
+    ASSERT_EQ(56u, proc.maxNegotiatedMessageSize());
 
-    void testHeaderSize() {
-        P9Protocol proc;
+    ASSERT_ANY_THROW(proc.maxNegotiatedMessageSize(300));
+}
 
-        CPPUNIT_ASSERT_EQUAL(4u + 1u + 2u, proc.headerSize());
-    }
+TEST(P9p2000x, testParsingMessageHeader) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
 
-    void testSettingFrameSize() {
-        P9Protocol proc(127);
+    // Form a normal message with no data:
+    ByteBuffer buffer(_mem.create(512));
+    buffer << P9Protocol::size_type(4 + 1 + 2);
+    buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
+    buffer << P9Protocol::Tag(1);
 
-        CPPUNIT_ASSERT_EQUAL(127u, proc.maxPossibleMessageSize());
-        CPPUNIT_ASSERT_EQUAL(127u, proc.maxNegotiatedMessageSize());
+    auto res = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(res.isOk());
 
-        proc.maxNegotiatedMessageSize(56);
-        CPPUNIT_ASSERT_EQUAL(127u, proc.maxPossibleMessageSize());
-        CPPUNIT_ASSERT_EQUAL(56u, proc.maxNegotiatedMessageSize());
+    auto header = res.unwrap();
+    ASSERT_EQ(4u + 1u + 2u, header.size);
+    ASSERT_EQ(P9Protocol::MessageType::TVersion, header.type);
+    ASSERT_EQ(1_us, header.tag);
+}
 
-        bool throwCorrect = false;
-        try {
-            proc.maxNegotiatedMessageSize(300);
-        } catch (const Solace::IndexOutOfRangeException& ) {
-            throwCorrect = true;
-        }
+TEST(P9p2000x, testParsingHeaderWithInsufficientData) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
 
-        if (!throwCorrect)
-            CPPUNIT_FAIL("No expected exception was thrown");
-//        CPPUNIT_ASSERT_THROW(proc.maxNegotiatedMessageSize(300), Solace::IndexOutOfRangeException);
-//        CPPUNIT_ASSERT_THROW(proc.maxNegotiatedMessageSize(300), Exception);
-    }
+    ByteBuffer buffer(_mem.create(512));
+    // Only write one header field. Should be not enough data to read a header.
+    buffer << P9Protocol::size_type(4 + 1 + 2);
+    auto res = proc.parseMessageHeader(buffer.flip());
 
-    void testParsingMessageHeader() {
-        MemoryManager _mem(1024);
-        P9Protocol proc;
-
-        // Form a normal message with no data:
-        ByteBuffer buffer(_mem.create(512));
-        buffer << P9Protocol::size_type(4 + 1 + 2);
-        buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
-        buffer << P9Protocol::Tag(1);
-
-        auto res = proc.parseMessageHeader(buffer.flip());
-        CPPUNIT_ASSERT(res.isOk());
-
-        auto header = res.unwrap();
-        CPPUNIT_ASSERT_EQUAL(4u + 1u + 2u, header.size);
-        CPPUNIT_ASSERT_EQUAL(P9Protocol::MessageType::TVersion, header.type);
-        CPPUNIT_ASSERT_EQUAL(1_us, header.tag);
-    }
-
-    void testParsingHeaderWithInsufficientData() {
-        MemoryManager _mem(1024);
-        P9Protocol proc;
-
-        ByteBuffer buffer(_mem.create(512));
-        // Only write one header field. Should be not enough data to read a header.
-        buffer << P9Protocol::size_type(4 + 1 + 2);
-        auto res = proc.parseMessageHeader(buffer.flip());
-
-        CPPUNIT_ASSERT(res.isError());
-    }
+    ASSERT_TRUE(res.isError());
+}
 
 
-    void testParsingIllformedMessageHeader() {
-        MemoryManager _mem(1024);
-        P9Protocol proc;
+TEST(P9p2000x, testParsingIllformedMessageHeader) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
 
-        ByteBuffer buffer(_mem.create(512));
-        // Set declared message size less then header size.
-        buffer << P9Protocol::size_type(1 + 2);
-        buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
-        buffer << P9Protocol::Tag(1);
+    ByteBuffer buffer(_mem.create(512));
+    // Set declared message size less then header size.
+    buffer << P9Protocol::size_type(1 + 2);
+    buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
+    buffer << P9Protocol::Tag(1);
 
-        auto res = proc.parseMessageHeader(buffer.flip());
-        CPPUNIT_ASSERT(res.isError());
-    }
+    auto res = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(res.isError());
+}
 
-    void testParsingIllformedHeaderForMessagesLargerMTU() {
-        MemoryManager _mem(1024);
-        P9Protocol proc;
+TEST(P9p2000x, testParsingIllformedHeaderForMessagesLargerMTU) {
+    MemoryManager _mem(1024);
+    P9Protocol proc;
 
-        ByteBuffer buffer(_mem.create(512));
-        proc.maxNegotiatedMessageSize(20);
-        // Set declared message size to be more then negotiated message size
-        buffer << P9Protocol::size_type(proc.maxNegotiatedMessageSize() + 100);
-        buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
-        buffer << P9Protocol::Tag(1);
+    ByteBuffer buffer(_mem.create(512));
+    proc.maxNegotiatedMessageSize(20);
+    // Set declared message size to be more then negotiated message size
+    buffer << P9Protocol::size_type(proc.maxNegotiatedMessageSize() + 100);
+    buffer << static_cast<byte>(P9Protocol::MessageType::TVersion);
+    buffer << P9Protocol::Tag(1);
 
-        auto res = proc.parseMessageHeader(buffer.flip());
-        CPPUNIT_ASSERT(res.isError());
-    }
+    auto res = proc.parseMessageHeader(buffer.flip());
+    ASSERT_TRUE(res.isError());
+}
 
 
-    void createVersionRequest() {
-        MemoryManager _mem(1024);
-        ByteBuffer buffer(_mem.create(512));
+TEST(P9p2000x, createVersionRequest) {
+    MemoryManager _mem(1024);
+    ByteBuffer buffer(_mem.create(512));
 
-        const String testVersion = P9Protocol::PROTOCOL_VERSION;
-        const uint64 versionStringLen = testVersion.size();
+    const String testVersion = P9Protocol::PROTOCOL_VERSION;
+    const uint64 versionStringLen = testVersion.size();
 
-        P9Protocol proc;
-        proc.createVersionRequest(0, buffer, testVersion);
+    P9Protocol proc;
+    proc.createVersionRequest(0, buffer, testVersion);
 
-        CPPUNIT_ASSERT_EQUAL(proc.headerSize() + 4 + 2 + versionStringLen, buffer.position());
-    }
+    ASSERT_EQ(proc.headerSize() + 4 + 2 + versionStringLen, buffer.position());
+}
 
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(Test9p2000x);

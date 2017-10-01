@@ -15,7 +15,8 @@
  *******************************************************************************/
 #include <cadence/async/timer.hpp>  // Class being tested
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
+
 
 #include <thread>
 #include <chrono>
@@ -25,69 +26,57 @@ using namespace cadence::async;
 using namespace std::chrono_literals;
 
 
-class TestAsyncTimer : public CppUnit::TestFixture {
-	CPPUNIT_TEST_SUITE(TestAsyncTimer);
-        CPPUNIT_TEST(testTimeout);
-        CPPUNIT_TEST(testGetTimeout);
-	CPPUNIT_TEST_SUITE_END();
+TEST(TestAsyncTimer, testTimeout) {
+    EventLoop iocontext;
+    int64 nbTimesCalled = 0;
 
-protected:
-public:
+    Timer timer(iocontext, boost::posix_time::millisec(15));
 
-	void testTimeout() {
-        EventLoop iocontext;
-        int64 nbTimesCalled = 0;
+    // We managed to cancel the timer. Start new asynchronous wait.
+    timer.asyncWait().then([&nbTimesCalled, &iocontext](int64 numberOfExpirations) {
+        nbTimesCalled += numberOfExpirations;
+    });
 
-        Timer timer(iocontext, boost::posix_time::millisec(15));
+    iocontext.run();
+    std::thread watchdog([&iocontext]() {
+        using namespace std::chrono_literals;
 
-        // We managed to cancel the timer. Start new asynchronous wait.
-        timer.asyncWait().then([&nbTimesCalled, &iocontext](int64 numberOfExpirations) {
-            nbTimesCalled += numberOfExpirations;
-        });
+        std::this_thread::sleep_for(30ms);
+        iocontext.stop();
+    });
 
-        iocontext.run();
-        std::thread watchdog([&iocontext]() {
-            using namespace std::chrono_literals;
+    // Should block untill event is triggered
+    watchdog.join();
 
-            std::this_thread::sleep_for(30ms);
-            iocontext.stop();
-        });
+    ASSERT_EQ(1L, nbTimesCalled);
+}
 
-        // Should block untill event is triggered
-        watchdog.join();
+TEST(TestAsyncTimer, testGetTimeout) {
+    EventLoop iocontext;
+    int nbTimesCalled = 0;
 
-        CPPUNIT_ASSERT_EQUAL(1L, nbTimesCalled);
-    }
+    const int64 timeoutTime = 15;
+    Timer timer(iocontext, boost::posix_time::millisec(timeoutTime));
+    timer.asyncWait().then([&nbTimesCalled, &iocontext](int64 numberOfExpirations) {
+        nbTimesCalled += numberOfExpirations;
+    });
 
-	void testGetTimeout() {
-        EventLoop iocontext;
-        int nbTimesCalled = 0;
+    const auto initTimeout = timer.getTimeout();
+    ASSERT_LE(timeoutTime - initTimeout.total_milliseconds(), 3);
 
-        const int64 timeoutTime = 15;
-        Timer timer(iocontext, boost::posix_time::millisec(timeoutTime));
-        timer.asyncWait().then([&nbTimesCalled, &iocontext](int64 numberOfExpirations) {
-            nbTimesCalled += numberOfExpirations;
-        });
+    iocontext.run();
 
-        const auto initTimeout = timer.getTimeout();
-        CPPUNIT_ASSERT((timeoutTime - initTimeout.total_milliseconds()) < 3);
+    const auto timeout = timer.getTimeout();
+    ASSERT_EQ(timeoutTime, timeoutTime - timeout.total_milliseconds());
 
-        iocontext.run();
+    std::thread watchdog([&iocontext]() {
 
-        const auto timeout = timer.getTimeout();
-        CPPUNIT_ASSERT_EQUAL(timeoutTime, timeoutTime - timeout.total_milliseconds());
+        std::this_thread::sleep_for(300ms);
+        iocontext.stop();
+    });
 
-        std::thread watchdog([&iocontext]() {
+    // Should block untill event is triggered
+    watchdog.join();
 
-            std::this_thread::sleep_for(300ms);
-            iocontext.stop();
-        });
-
-        // Should block untill event is triggered
-        watchdog.join();
-
-        CPPUNIT_ASSERT_EQUAL(1, nbTimesCalled);
-    }
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAsyncTimer);
+    ASSERT_EQ(1, nbTimesCalled);
+}

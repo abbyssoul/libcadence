@@ -23,6 +23,12 @@ SRC_DIR = src
 GEN_SRC_DIR = $(SRC_DIR)/generated
 SRC_PROTO_DIR = $(SRC_DIR)/proto
 
+# Google test framework:
+GTEST_LIB = gtest
+GTEST_DIR = external/gtest/googletest
+GTEST_TARGET = $(BUILD_DIR)/lib/lib$(GTEST_LIB).a
+
+# Project Test Suit
 TEST_SRC_DIR = test
 TEST_NAME = test_$(PROJECT)
 TEST_TARGET_DIR = $(BUILD_DIR)/bin
@@ -57,8 +63,9 @@ CXXFLAGS += -pedantic -Wall -Wextra -Wabi -Wfloat-equal \
 -Wcast-qual -Wno-sign-compare -Wno-multichar
 
 # Add debug or release flags as required
+# FIXME: Can't use -D_GLIBCXX_DEBUG until libsolace use it, subject to move from CppUnit to GTest
 ifdef dbg
-	CXXFLAGS += -O0 -D _DEBUG -ggdb3 $(dbg)
+	CXXFLAGS += -O0 -ggdb3 -DDEBUG -D _DEBUG
 else # Release optimizations
 	CXXFLAGS += -Ofast -flto
 endif
@@ -66,20 +73,23 @@ endif
 
 CPPFLAGS += -I$(PUBLIC_HEADERS) -D_FORTIFY_SOURCE=2
 CPPFLAGS += -Iexternal/asio/asio/include \
-			-I../libsolace/include
+			-I../libsolace/include \
+			-isystem ${GTEST_DIR}/include
 
 # LD flags and LIBS only make sense for tests and example when building a library project
 LDFLAGS +=  -L$(TARGET_DIR) \
-			-L../libsolace/build/src \
-			-L../libsolace/build/libs/fmt/fmt
+			-L$(BUILD_DIR)/lib \
+			-L../libsolace/build/src
 
-LIBS += -l$(PROJECT) -lsolace -lfmt -lrt -lm -lcppunit -pthread
+LDLIBS += -l$(PROJECT) -lsolace -pthread
+
+test_LDLIBS = -l$(GTEST_LIB)
 
 # Export compiler options and extra libs for examples and tests
 export CXXFLAGS
 export CPPFLAGS
 export LDFLAGS
-export LIBS
+export LDLIBS
 
 
 $(PROJECT): $(TARGET)
@@ -132,14 +142,22 @@ examples:
 #-------------------------------------------------------------------------------
 # Build unit tests
 #-------------------------------------------------------------------------------
+$(BUILD_DIR)/gtest-all.o: ${GTEST_DIR}/src/gtest-all.cc
+	@mkdir -p $(dir $@)
+	$(CXX) -isystem ${GTEST_DIR}/include -I${GTEST_DIR} -pthread $(CXXFLAGS) $(CPPFLAGS) -c -o $@ ${GTEST_DIR}/src/gtest-all.cc
+
+$(GTEST_TARGET): $(BUILD_DIR)/gtest-all.o
+	@mkdir -p $(dir $@)
+	$(AR) rcs $@ $^
+
 $(TEST_TARGET_DIR):
 	@mkdir -p $@
 
-$(TEST_TAGRET): $(TARGET) $(TEST_TARGET_DIR)
+$(TEST_TAGRET): $(TARGET) $(TEST_TARGET_DIR) $(GTEST_TARGET)
 
 
 $(TEST_TAGRET): $(test_obj)
-	$(CXX) -o $@ $(CXXFLAGS) $(test_obj) $(LDFLAGS) $(LDFLAGS_test) $(LIBS)
+	$(CXX) -o $@ $(CXXFLAGS) $(test_obj) $(LDFLAGS) $(LDLIBS) $(test_LDLIBS)
 
 .PHONY: test
 test: $(TEST_TAGRET)

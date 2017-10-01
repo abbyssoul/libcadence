@@ -15,7 +15,7 @@
  * $Revision: 88625 $
 */
 
-#include "teamcity_cppunit.h"
+#include "teamcity_cppunit.h.xxx"
 
 #include <sstream>
 

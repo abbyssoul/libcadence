@@ -13,7 +13,7 @@
  * limitations under the License.
  *
  */
-/*)
+
 #include "teamcity_gtest.h"
 
 namespace jetbrains {
@@ -84,4 +84,3 @@ void TeamcityGoogleTestEventListener::OnTestCaseEnd(const TestCase& test_case) {
 
 }
 }
-*/

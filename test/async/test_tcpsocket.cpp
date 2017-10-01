@@ -14,7 +14,8 @@
  * Created on: 10/10/2016
  *******************************************************************************/
 #include <cadence/async/tcpsocket.hpp>  // Class being tested
-#include <cppunit/extensions/HelperMacros.h>
+
+#include "gtest/gtest.h"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -22,62 +23,50 @@
 using namespace Solace;
 using namespace cadence::async;
 
-class TestTcpSocket: public CppUnit::TestFixture {
+TEST(TestTcpSocket, testAsyncReadWrite) {
+    EventLoop iocontext;
+    bool connectionAccepted = false;
 
-	CPPUNIT_TEST_SUITE(TestTcpSocket);
-        CPPUNIT_TEST(testAsyncReadWrite);
-	CPPUNIT_TEST_SUITE_END();
+    TcpSocket ioTcpServerSocket(iocontext, 20000);
+    TcpSocket ioTcpClientSocket(iocontext, 20000);
+    TcpAcceptor acceptor(iocontext, 20000);
 
-protected:
-public:
+    String endpoint("127.0.0.1");
+    ioTcpClientSocket.connect(endpoint);
 
-	void testAsyncReadWrite() {
-        EventLoop iocontext;
-        bool connectionAccepted = false;
+    char message[] = "Hello there!";
+    const ByteBuffer::size_type messageLen = strlen(message) + 1;
+    auto messageBuffer = ByteBuffer(wrapMemory(message));
 
-        TcpSocket ioTcpServerSocket(iocontext, 20000);
-        TcpSocket ioTcpClientSocket(iocontext, 20000);
-        TcpAcceptor acceptor(iocontext, 20000);
+    char rcv_buffer[128];
+    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
 
-        String endpoint("127.0.0.1");
-        ioTcpClientSocket.connect(endpoint);
+    bool readComplete = false;
+    bool writeComplete = false;
 
-        char message[] = "Hello there!";
-        const ByteBuffer::size_type messageLen = strlen(message) + 1;
-        auto messageBuffer = ByteBuffer(wrapMemory(message));
+    acceptor.asyncAccept(ioTcpServerSocket)
+            .then([&connectionAccepted, &ioTcpServerSocket, &readBuffer, &messageLen, &readComplete]() {
+        connectionAccepted = true;
 
-        char rcv_buffer[128];
-        auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
-
-        bool readComplete = false;
-        bool writeComplete = false;
-
-        acceptor.asyncAccept(ioTcpServerSocket)
-                .then([&connectionAccepted, &ioTcpServerSocket, &readBuffer, &messageLen, &readComplete]() {
-            connectionAccepted = true;
-
-            ioTcpServerSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
-                readComplete = true;
-            });
+        ioTcpServerSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
+            readComplete = true;
         });
+    });
 
-        ioTcpClientSocket.asyncWrite(messageBuffer).then([&writeComplete]() {
-            writeComplete = true;
-        });
+    ioTcpClientSocket.asyncWrite(messageBuffer).then([&writeComplete]() {
+        writeComplete = true;
+    });
 
-        iocontext.runFor(300);
+    iocontext.runFor(300);
 
-        CPPUNIT_ASSERT(connectionAccepted);
+    ASSERT_TRUE(connectionAccepted);
 
-        // Check that we have read something
-        CPPUNIT_ASSERT_EQUAL(true, writeComplete);
-        CPPUNIT_ASSERT_EQUAL(true, readComplete);
+    // Check that we have read something
+    ASSERT_TRUE(writeComplete);
+    ASSERT_TRUE(readComplete);
 
-        // Check that we read as much as was written
-        CPPUNIT_ASSERT_EQUAL(false, messageBuffer.hasRemaining());
-        CPPUNIT_ASSERT_EQUAL(messageLen, messageBuffer.position());
-        CPPUNIT_ASSERT_EQUAL(messageLen, readBuffer.position());
-	}
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestTcpSocket);
+    // Check that we read as much as was written
+    ASSERT_FALSE(messageBuffer.hasRemaining());
+    ASSERT_EQ(messageLen, messageBuffer.position());
+    ASSERT_EQ(messageLen, readBuffer.position());
+}

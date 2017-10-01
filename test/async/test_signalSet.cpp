@@ -15,7 +15,7 @@
  *******************************************************************************/
 #include <cadence/async/signalSet.hpp>  // Class being tested
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 #include <thread>
 #include <chrono>
@@ -24,115 +24,90 @@
 
 using namespace Solace;
 using namespace cadence::async;
+using namespace std::chrono_literals;
 
-class TestAsyncSignalSet: public CppUnit::TestFixture {
 
-	CPPUNIT_TEST_SUITE(TestAsyncSignalSet);
-        CPPUNIT_TEST(testSubscription);
-        CPPUNIT_TEST(testSubscription2);
-        CPPUNIT_TEST(testSubscriptionNonLeakage);
-	CPPUNIT_TEST_SUITE_END();
+TEST(TestAsyncSignalSet, testSubscription) {
+    EventLoop iocontext;
+    SignalSet signalSet(iocontext, { SIGUSR1 });
 
-protected:
-public:
+    bool eventWasCalled = false;
 
-	void testSubscription() {
-        EventLoop iocontext;
-        SignalSet signalSet(iocontext, { SIGUSR1 });
+    raise(SIGUSR1);
 
-        bool eventWasCalled = false;
+    signalSet.asyncWait().then([&eventWasCalled, &iocontext](int signalId) {
 
-        raise(SIGUSR1);
+        eventWasCalled = (signalId == SIGUSR1);
+    });
 
-        signalSet.asyncWait().then([&eventWasCalled, &iocontext](int signalId) {
+    std::thread t([&iocontext]() {
+        std::this_thread::sleep_for(200ms);
+        iocontext.stop();
+    });
 
-            CPPUNIT_ASSERT_EQUAL(signalId, SIGUSR1);
+    iocontext.run();
+    // Should block untill event is triggered
+    t.join();
 
-            eventWasCalled = true;
-        });
 
-        iocontext.run();
+    ASSERT_TRUE(eventWasCalled);
+}
 
-        std::thread t([&iocontext]() {
-            using namespace std::chrono_literals;
 
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+TEST(TestAsyncSignalSet, testSubscription2) {
+    EventLoop iocontext;
+    SignalSet signalSet(iocontext, { SIGUSR1, SIGUSR2 });
 
-            iocontext.getIOService().stop();
+    bool eventWasCalled = false;
 
-        });
+    raise(SIGUSR1);
+    raise(SIGUSR2);
 
-        // Should block untill event is triggered
-        t.join();
-    }
+    signalSet.asyncWait().then([&eventWasCalled](int signalId) {
+        eventWasCalled = (signalId == SIGUSR1) || (signalId == SIGUSR2);
+    });
 
-	void testSubscription2() {
-        EventLoop iocontext;
-        SignalSet signalSet(iocontext, { SIGUSR1, SIGUSR2 });
+    std::thread t([&iocontext]() {
+        std::this_thread::sleep_for(200ms);
+        iocontext.stop();
+    });
 
-        bool eventWasCalled = false;
+    iocontext.run();
+    // Should block untill event is triggered
+    t.join();
 
-        raise(SIGUSR1);
-        raise(SIGUSR2);
+    ASSERT_TRUE(eventWasCalled);
+}
 
-        signalSet.asyncWait().then([&eventWasCalled](int signalId) {
 
-            CPPUNIT_ASSERT((signalId == SIGUSR1) || (signalId == SIGUSR2));
+TEST(TestAsyncSignalSet, testSubscriptionNonLeakage) {
+    EventLoop iocontext;
+    SignalSet signalSet1(iocontext, { SIGUSR1 });
+    SignalSet signalSet2(iocontext, { SIGUSR2 });
 
-            eventWasCalled = true;
-        });
+    bool event1_wasCalled = false;
+    bool event2_wasCalled = false;
 
-        iocontext.run();
+    raise(SIGUSR1);
+    raise(SIGUSR2);
 
-        std::thread t([&iocontext]() {
-            using namespace std::chrono_literals;
+    signalSet1.asyncWait().then([&event1_wasCalled](int signalId) {
+        event1_wasCalled = (SIGUSR1 == signalId);
+    });
 
-            std::this_thread::sleep_for(200ms);
-            iocontext.getIOService().stop();
-        });
+    signalSet2.asyncWait().then([&event2_wasCalled](int signalId) {
+        event2_wasCalled = (SIGUSR2 == signalId);
+    });
 
-        // Should block untill event is triggered
-        t.join();
-    }
+    std::thread t([&iocontext]() {
+        std::this_thread::sleep_for(200ms);
+        iocontext.stop();
+    });
 
-    void testSubscriptionNonLeakage() {
-        EventLoop iocontext;
-        SignalSet signalSet1(iocontext, { SIGUSR1 });
-        SignalSet signalSet2(iocontext, { SIGUSR2 });
+    iocontext.run();
+    // Should block untill event is triggered
+    t.join();
 
-        bool event1_wasCalled = false;
-        bool event2_wasCalled = false;
-
-        CPPUNIT_ASSERT(!event1_wasCalled);
-        CPPUNIT_ASSERT(!event2_wasCalled);
-
-        raise(SIGUSR1);
-        raise(SIGUSR2);
-
-        signalSet1.asyncWait().then([&event1_wasCalled](int signalId) {
-            CPPUNIT_ASSERT_EQUAL(SIGUSR1, signalId);
-
-            event1_wasCalled = true;
-        });
-
-        signalSet2.asyncWait().then([&event2_wasCalled](int signalId) {
-            CPPUNIT_ASSERT_EQUAL(SIGUSR2, signalId);
-
-            event2_wasCalled = true;
-        });
-
-        iocontext.run();
-
-        std::thread t([&iocontext]() {
-            using namespace std::chrono_literals;
-
-            std::this_thread::sleep_for(200ms);
-            iocontext.getIOService().stop();
-        });
-
-        // Should block untill event is triggered
-        t.join();
-    }
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAsyncSignalSet);
+    ASSERT_TRUE(event1_wasCalled);
+    ASSERT_TRUE(event2_wasCalled);
+}

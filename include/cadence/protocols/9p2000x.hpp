@@ -235,7 +235,7 @@ public:
         return _maxNegotiatedMessageSize;
     }
 
-    size_type maxNegotiatedMessageSize(size_type newMessageSize) noexcept;
+    size_type maxNegotiatedMessageSize(size_type newMessageSize);
 
     static constexpr size_type headerSize() noexcept {
         // Note: can't use sizeof(MessageHeader) due to padding

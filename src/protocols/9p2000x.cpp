@@ -567,7 +567,7 @@ P9Protocol::parseMessage(const MessageHeader& header, ByteBuffer& data) {
 }
 
 
-P9Protocol::size_type P9Protocol::maxNegotiatedMessageSize(size_type newMessageSize) noexcept {
+P9Protocol::size_type P9Protocol::maxNegotiatedMessageSize(size_type newMessageSize) {
     Solace::assertIndexInRange(newMessageSize, 0, maxPossibleMessageSize());
     _maxNegotiatedMessageSize = std::min(newMessageSize, maxPossibleMessageSize());
 

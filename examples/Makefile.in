@@ -16,9 +16,9 @@ $(EXAMPLES_BIN):
 
 $(EXAMPLES_BUILD)/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) -c $(LOCAL_CXXFLAGS) $(LOCAL_CPPFLAGS) -o $@ $<
+	$(CXX) -c $(CXXFLAGS) $(LOCAL_CPPFLAGS) -o $@ $<
 
 
 # Async_serial
 $(EXAMPLES_BIN)/async_serial: $(EXAMPLES_BUILD)/async_serial.o $(EXAMPLES_BIN)
-	$(CXX) -o $@ $(LOCAL_CXXFLAGS) $< $(LOCAL_LDFLAGS) $(LIBS)
+	$(CXX) -o $@ $(LOCAL_CXXFLAGS) $< $(LOCAL_LDFLAGS) $(LDLIBS)

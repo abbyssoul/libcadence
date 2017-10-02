@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 using namespace Solace;
+using namespace cadence;
 using namespace cadence::async;
 
 
@@ -39,17 +40,14 @@ TEST(TestUdpSocket, testAsyncReadWrite) {
     bool readComplete = false;
     bool writeComplete = false;
 
-    UdpSocketReceiver receiver("localhost", "20001");
-    udpServerSocket.asyncWrite(messageBuffer, receiver).then([&writeComplete]() {
-        writeComplete = true;
+    IPEndpoint receiver("127.0.0.1", 20000);
+
+    udpServerSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
+        readComplete = true;
     });
 
-    // udpServerSocket.asyncWrite(messageBuffer, "localhost", "20001").then([&writeComplete]() {
-    // 	writeComplete = true;
-    // });
-
-    udpClientSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
-        readComplete = true;
+    udpClientSocket.asyncWriteTo(messageBuffer, receiver).then([&writeComplete]() {
+        writeComplete = true;
     });
 
     iocontext.runFor(300);

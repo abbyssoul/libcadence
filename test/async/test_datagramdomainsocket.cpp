@@ -44,8 +44,8 @@ TEST_F(TestDatagramDomainSocket, asyncReadWrite) {
     DatagramDomainSocket::endpoint_type testClientSocketName(testClientSocketNameStr);
     DatagramDomainSocket::endpoint_type testServerSocketName(testServerSocketNameStr);
 
-    DatagramDomainSocket udpServerSocket(iocontext, testServerSocketName);
-    DatagramDomainSocket udpClientSocket(iocontext, testClientSocketName);
+    DatagramDomainSocket serverSocket(iocontext, testServerSocketName);
+    DatagramDomainSocket clientSocket(iocontext, testClientSocketName);
 
     char message[] = "Hello there!";
     const ByteBuffer::size_type messageLen = strlen(message) + 1;
@@ -58,14 +58,14 @@ TEST_F(TestDatagramDomainSocket, asyncReadWrite) {
     bool readComplete = false;
     bool writeComplete = false;
 
-    udpServerSocket.asyncWrite(messageBuffer, messageLen, testClientSocketName)
+    clientSocket.asyncWriteTo(messageBuffer, messageLen, testServerSocketName)
         .then([&writeComplete]() {
             writeComplete = true;
         }).onError([](Error&& e) {
             ADD_FAILURE() << e.toString().to_str();
         });
 
-    udpClientSocket.asyncRead(readBuffer, messageLen, testClientSocketName)
+    serverSocket.asyncRead(readBuffer, messageLen)
         .then([&readComplete]() {
             readComplete = true;
         }).onError([](Error&& e) {

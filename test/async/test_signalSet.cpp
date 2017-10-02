@@ -36,7 +36,6 @@ TEST(TestAsyncSignalSet, testSubscription) {
     raise(SIGUSR1);
 
     signalSet.asyncWait().then([&eventWasCalled, &iocontext](int signalId) {
-
         eventWasCalled = (signalId == SIGUSR1);
     });
 

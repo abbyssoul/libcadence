@@ -17,8 +17,6 @@
 
 #include "gtest/gtest.h"
 
-#include <unistd.h>
-#include <fcntl.h>
 
 using namespace Solace;
 using namespace cadence::async;

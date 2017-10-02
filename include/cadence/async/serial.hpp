@@ -24,13 +24,10 @@
 
 namespace cadence { namespace async {
 
-class SerialChannel {
-public:
-    typedef std::size_t size_type;
-
+class SerialChannel : public Channel {
 public:
 
-    ~SerialChannel() = default;
+    ~SerialChannel();
 
     SerialChannel(EventLoop& ioContext,
            const Solace::Path& file,
@@ -41,7 +38,6 @@ public:
            Solace::IO::Serial::Flowcontrol flowcontrol = Solace::IO::Serial::Flowcontrol::none);
 
     SerialChannel(const SerialChannel& rhs) = delete;
-
     SerialChannel& operator= (const SerialChannel& rhs) = delete;
 
     SerialChannel(SerialChannel&& rhs);
@@ -50,23 +46,10 @@ public:
         return swap(rhs);
     }
 
-    SerialChannel& swap(SerialChannel& rhs) noexcept {
-        using std::swap;
+    SerialChannel& swap(SerialChannel& rhs) noexcept;
 
-        swap(_serial, rhs._serial);
-
-        return *this;
-    }
-    /**
-	 * Post an async read request to read data from this IO object into the given buffer.
-	 * This method reads the data until the provided destination buffer is full.
-	 *
-	 * @param dest The provided destination buffer to read data into.
-	 * @return A future that will be resolved one the buffer has been filled.
-	 */
-    Solace::Future<size_type> asyncRead(Solace::ByteBuffer& dest) {
-		return asyncRead(dest, dest.remaining());
-	}
+    using Channel::asyncRead;
+    using Channel::asyncWrite;
 
 	/**
 	 * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -77,18 +60,7 @@ public:
 	 *
 	 * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
 	 */
-    Solace::Future<size_type> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead);
-
-	/**
-	 * Post an async write request to write specified amount of data into this IO object.
-	 * This method writes whole content of the provided buffer into the IO objec.
-	 *
-	 * @param src The provided source buffer to read data from.
-	 * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
-	 */
-    Solace::Future<size_type> asyncWrite(Solace::ByteBuffer& src) {
-		return asyncWrite(src, src.remaining());
-	}
+    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) override;
 
 	/**
 	 * Post an async write request to write specified amount of data into this IO object.
@@ -99,12 +71,13 @@ public:
 	 *
 	 * @note If the provided source buffer does not have requested amount of data - an exception is raised.
 	 */
-    Solace::Future<size_type> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite);
+    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+
 
 private:
 
-	asio::serial_port _serial;
-
+    class SerialImpl;
+    std::unique_ptr<SerialImpl> _pimpl;
 };
 
 

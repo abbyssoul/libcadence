@@ -28,7 +28,7 @@ namespace cadence { namespace async {
 class Event {
 public:
 
-	~Event() = default;
+    ~Event();
 
 	Event(const Event& rhs) = delete;
     Event& operator= (const Event& rhs) = delete;
@@ -41,11 +41,7 @@ public:
         return swap(rhs);
     }
 
-    Event& swap(Event& rhs) noexcept {
-        std::swap(_eventFd, rhs._eventFd);
-
-        return *this;
-    }
+    Event& swap(Event& rhs) noexcept;
 
 
     Solace::Future<void> asyncWait();
@@ -53,10 +49,8 @@ public:
     void notify();
 
 private:
-
-    asio::posix::stream_descriptor _eventFd;
-    Solace::uint64 _readBuffer;
-
+    class EventImpl;
+    std::unique_ptr<EventImpl> _pimpl;
 };
 
 inline void swap(Event& lhs, Event& rhs) noexcept {

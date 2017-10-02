@@ -17,6 +17,7 @@
 
 #include "gtest/gtest.h"
 
+#include <thread>
 
 using namespace Solace;
 using namespace cadence::async;
@@ -32,7 +33,7 @@ TEST(TestAsyncEvent, subscription) {
         eventWasCalled = true;
     });
 
-    asio::thread t([&iocontext]() {
+    std::thread t([&iocontext]() {
         using namespace std::chrono_literals;
         iocontext.run();
 

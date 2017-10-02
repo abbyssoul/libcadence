@@ -76,7 +76,7 @@ int main(int argc, const char **argv) {
     MemoryManager memManager(2048);
     ByteBuffer readBuffer(memManager.create(bufferSize));
 
-    serial.asyncRead(readBuffer).then([&readBuffer](int ) {
+    serial.asyncRead(readBuffer).then([&readBuffer]() {
         auto dataView = readBuffer.viewWritten();
         std::cout.write(dataView.dataAs<const char>(), dataView.size());
         std::cout.flush();

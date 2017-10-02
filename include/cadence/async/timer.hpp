@@ -30,22 +30,21 @@ namespace cadence { namespace async {
 class Timer {
 public:
     //!< Absolute point in time
-    typedef asio::deadline_timer::time_type time_type;
+    typedef std::chrono::system_clock::time_point time_type;
 
     //!< Duration of time
-    typedef asio::deadline_timer::duration_type duration_type;
+    typedef std::chrono::milliseconds 	 duration_type;
 
 public:
 
-    ~Timer() = default;
+    ~Timer();
 
     Timer(const Timer& rhs) = delete;
-
     Timer& operator= (const Timer& rhs) = delete;
 
     Timer(EventLoop& ioContext);
 
-    Timer(EventLoop& ioContext, time_type pointInTime);
+//    Timer(EventLoop& ioContext, time_type pointInTime);
 
     Timer(EventLoop& ioContext, duration_type durationFromNow);
 
@@ -55,17 +54,7 @@ public:
         return swap(rhs);
     }
 
-    Timer& operator> (Timer&& rhs) noexcept {
-        return swap(rhs);
-    }
-
-    Timer& swap(Timer& rhs) noexcept {
-        using std::swap;
-
-        swap(_timer, rhs._timer);
-
-        return *this;
-    }
+    Timer& swap(Timer& rhs) noexcept;
 
 
     Solace::Future<Solace::int64> asyncWait();
@@ -77,8 +66,8 @@ public:
 	Timer& cancel();
 
 private:
-    asio::deadline_timer _timer;
-
+    class TimerImpl;
+    std::unique_ptr<TimerImpl> _pimpl;
 };
 
 inline void swap(Timer& lhs, Timer& rhs) noexcept {

@@ -21,17 +21,18 @@
 #include <fcntl.h>
 
 using namespace Solace;
+using namespace cadence;
 using namespace cadence::async;
 
 TEST(TestTcpSocket, testAsyncReadWrite) {
     EventLoop iocontext;
     bool connectionAccepted = false;
 
-    TcpSocket ioTcpServerSocket(iocontext, 20000);
-    TcpSocket ioTcpClientSocket(iocontext, 20000);
+    TcpSocket ioTcpServerSocket(iocontext);
+    TcpSocket ioTcpClientSocket(iocontext);
     TcpAcceptor acceptor(iocontext, 20000);
 
-    String endpoint("127.0.0.1");
+    IPEndpoint endpoint("127.0.0.1", 20000);
     ioTcpClientSocket.connect(endpoint);
 
     char message[] = "Hello there!";

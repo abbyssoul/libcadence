@@ -140,7 +140,7 @@ void readStat(ByteBuffer& src, P9Protocol::Stat* stat) {
 
 
 P9Protocol::fid_type P9Protocol::allocateFid() {
-    return 2 * _currentTag + 1;  // FIXME: It is really WTF!
+    return 2 * 3 + 1;  // FIXME: It is really WTF!
 }
 
 
@@ -586,12 +586,13 @@ P9Protocol::size_type P9Protocol::maxNegotiatedMessageSize(size_type newMessageS
 }
 
 
-P9Protocol::P9Protocol(size_type maxMassageSize) :
+P9Protocol::P9Protocol(size_type maxMassageSize, const Solace::String& version) :
     _maxMassageSize(maxMassageSize),
     _maxNegotiatedMessageSize(maxMassageSize),
-    _currentTag(1)
+    _initialVersion(version),
+    _negotiatedVersion(version)
 {
-
+    // No-op
 }
 
 

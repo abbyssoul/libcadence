@@ -28,16 +28,15 @@ namespace cadence { namespace async {
 /**
  * TODO(abbyssoul): document this class
  */
-class StreamDomainSocket {
+class StreamDomainSocket : public Channel {
 public:
     typedef Solace::String endpoint_type;
 
 public:
 
-    ~StreamDomainSocket() = default;
+    ~StreamDomainSocket();
 
     StreamDomainSocket(const StreamDomainSocket& rhs) = delete;
-
     StreamDomainSocket& operator= (const StreamDomainSocket& rhs) = delete;
 
     StreamDomainSocket(EventLoop& ioContext);
@@ -48,12 +47,7 @@ public:
         return swap(rhs);
     }
 
-    StreamDomainSocket& swap(StreamDomainSocket& rhs) noexcept {
-        using std::swap;
-        swap(_socket, rhs._socket);
-
-        return *this;
-    }
+    StreamDomainSocket& swap(StreamDomainSocket& rhs) noexcept;
 
 
     /**
@@ -70,16 +64,8 @@ public:
      */
     Solace::Future<void> asyncConnect(const endpoint_type& endpoint);
 
-    /**
-     * Post an async read request to read data from this IO object into the given buffer.
-     * This method reads the data until the provided destination buffer is full.
-     *
-     * @param dest The provided destination buffer to read data into.
-     * @return A future that will be resolved one the buffer has been filled.
-     */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest) {
-        return asyncRead(dest, dest.remaining());
-    }
+    using Channel::asyncRead;
+    using Channel::asyncWrite;
 
     /**
      * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -90,18 +76,7 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, std::size_t bytesToRead);
-
-    /**
-     * Post an async write request to write specified amount of data into this IO object.
-     * This method writes whole content of the provided buffer into the IO objec.
-     *
-     * @param src The provided source buffer to read data from.
-     * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
-     */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src) {
-        return asyncWrite(src, src.remaining());
-    }
+    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) override;
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -112,24 +87,29 @@ public:
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, std::size_t bytesToWrite);
+    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
 
 protected:
 
     friend class StreamDomainAcceptor;
-    asio::local::stream_protocol::socket _socket;
 
+    class StreamDomainSocketImpl;
+    std::unique_ptr<StreamDomainSocketImpl> _pimpl;
 };
 
 
 class StreamDomainAcceptor {
 public:
+    ~StreamDomainAcceptor();
+
     StreamDomainAcceptor(EventLoop& ioContext, const StreamDomainSocket::endpoint_type& file);
 
     Solace::Future<void> asyncAccept(StreamDomainSocket& socket);
 
 private:
-    asio::local::stream_protocol::acceptor _acceptor;
+
+    class AcceptorImpl;
+    std::unique_ptr<AcceptorImpl> _pimpl;
 };
 
 

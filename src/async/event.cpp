@@ -21,41 +21,70 @@
 using namespace Solace;
 using namespace cadence::async;
 
+class Event::EventImpl {
+public:
+    EventImpl(void* ioservice):
+        _eventFd(*static_cast<asio::io_service*>(ioservice), eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
+    {}
+
+    void notify() {
+        const auto result = eventfd_write(_eventFd.native_handle(), 1);
+
+        if (result < 0) {
+            raise<IOException>(errno);
+        }
+    }
+
+    Future<void> asyncWait() {
+        Promise<void> promise;
+        auto f = promise.getFuture();
+
+        _eventFd.async_read_some(asio::buffer(&_readBuffer, sizeof(_readBuffer)),
+            [pm = std::move(promise)] (const asio::error_code& error, std::size_t) mutable {
+            if (error) {
+                pm.setError(Solace::Error(error.message(), error.value()));
+            } else {
+                pm.setValue();
+            }
+        });
+
+        return f;
+    }
+
+private:
+    asio::posix::stream_descriptor _eventFd;
+    Solace::uint64 _readBuffer;
+};
+
+
+Event::~Event()
+{
+}
 
 Event::Event(EventLoop& ioContext) :
-    _eventFd(ioContext.getIOService(), eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
+    _pimpl(std::make_unique<EventImpl>(ioContext.getIOService()))
 {
 }
 
 
 Event::Event(Event&& rhs) :
-    _eventFd(std::move(rhs._eventFd))
+    _pimpl(std::move(rhs._pimpl))
 {
+}
+
+Event& Event::swap(Event& rhs) noexcept {
+    std::swap(_pimpl, rhs._pimpl);
+
+    return *this;
 }
 
 
 void Event::notify() {
-    const auto result = eventfd_write(_eventFd.native_handle(), 1);
-
-    if (result < 0) {
-        raise<IOException>(errno);
-    }
+    _pimpl->notify();
 }
 
 
 Future<void> Event::asyncWait() {
-    Promise<void> promise;
-    auto f = promise.getFuture();
-
-    _eventFd.async_read_some(asio::buffer(&_readBuffer, sizeof(_readBuffer)),
-        [pm = std::move(promise)] (const asio::error_code& error, std::size_t) mutable {
-        if (error) {
-            pm.setError(Solace::Error(error.message(), error.value()));
-        } else {
-			pm.setValue();
-        }
-	});
-
-    return f;
+    return _pimpl->asyncWait();
 }
 

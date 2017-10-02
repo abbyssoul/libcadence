@@ -10,10 +10,10 @@
  * @file: async/serialChannel.cpp
  *******************************************************************************/
 #include <cadence/async/serial.hpp>
-
-#include "asio.hpp"
-
 #include <solace/exception.hpp>
+
+#include "asio_helper.hpp"
+
 
 
 using namespace Solace;
@@ -59,6 +59,72 @@ asio::serial_port_base::flow_control::type toAsioFlowcontrol(Serial::Flowcontrol
 }
 
 
+class SerialChannel::SerialImpl {
+public:
+    SerialImpl(void* ioservice, const Path& file,
+                                 uint32 baudrate,
+                                 Serial::Bytesize bytesize,
+                                 Serial::Parity parity,
+                                 Serial::Stopbits stopbits,
+                                 Serial::Flowcontrol flowcontrol) :
+        _serial(*static_cast<asio::io_service*>(ioservice), file.toString().c_str())
+    {
+        _serial.set_option(asio::serial_port_base::baud_rate(baudrate));
+        _serial.set_option(asio::serial_port_base::character_size(static_cast<uint32>(bytesize)));
+        _serial.set_option(asio::serial_port_base::parity(toAsioParity(parity)));
+        _serial.set_option(asio::serial_port_base::stop_bits(toAsioStopbits(stopbits)));
+        _serial.set_option(asio::serial_port_base::flow_control(toAsioFlowcontrol(flowcontrol)));
+    }
+
+
+
+    Future<void>
+    asyncRead(ByteBuffer& buffer, size_type bytesToRead) {
+        Promise<void> promise;
+        auto f = promise.getFuture();
+
+        _serial.async_read_some(asio_buffer(buffer, bytesToRead),
+            [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
+            if (error) {
+                pm.setError(Solace::Error(error.message(), error.value()));
+            } else {
+                buffer.advance(length);
+                pm.setValue();
+            }
+        });
+
+        return f;
+    }
+
+
+    Future<void>
+    asyncWrite(ByteBuffer& buffer, size_type bytesToWrite) {
+        Promise<void> promise;
+        auto f = promise.getFuture();
+
+        _serial.async_read_some(asio_buffer(buffer, bytesToWrite),
+            [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
+            if (error) {
+                pm.setError(Solace::Error(error.message(), error.value()));
+            } else {
+                buffer.advance(length);
+                pm.setValue();
+            }
+        });
+
+        return f;
+    }
+
+
+private:
+    asio::serial_port _serial;
+};
+
+
+SerialChannel::~SerialChannel()
+{
+}
+
 
 SerialChannel::SerialChannel(EventLoop& ioContext, const Path& file,
                              uint32 baudrate,
@@ -66,54 +132,39 @@ SerialChannel::SerialChannel(EventLoop& ioContext, const Path& file,
                              Serial::Parity parity,
                              Serial::Stopbits stopbits,
                              Serial::Flowcontrol flowcontrol) :
-    _serial(ioContext.getIOService(), file.toString().c_str())
-{
-    _serial.set_option(asio::serial_port_base::baud_rate(baudrate));
-    _serial.set_option(asio::serial_port_base::character_size(static_cast<uint32>(bytesize)));
-    _serial.set_option(asio::serial_port_base::parity(toAsioParity(parity)));
-    _serial.set_option(asio::serial_port_base::stop_bits(toAsioStopbits(stopbits)));
-    _serial.set_option(asio::serial_port_base::flow_control(toAsioFlowcontrol(flowcontrol)));
-}
-
-
- SerialChannel::SerialChannel(SerialChannel&& rhs):
-        _serial(std::move(rhs._serial))
+    Channel(ioContext),
+    _pimpl(std::make_unique<SerialImpl>(ioContext.getIOService(), file,
+                                        baudrate,
+                                        bytesize,
+                                        parity,
+                                        stopbits,
+                                        flowcontrol))
 {
 }
 
 
-Future<SerialChannel::size_type>
+SerialChannel::SerialChannel(SerialChannel&& rhs) :
+    Channel(std::move(rhs)),
+    _pimpl(std::move(rhs._pimpl))
+{
+}
+
+
+SerialChannel&
+SerialChannel::swap(SerialChannel& rhs) noexcept {
+    using std::swap;
+    swap(_pimpl, rhs._pimpl);
+
+    return *this;
+}
+
+
+Future<void>
 SerialChannel::asyncRead(ByteBuffer& buffer, size_type bytesToRead) {
-    Promise<size_type> promise;
-    auto f = promise.getFuture();
-
-    _serial.async_read_some(asio_buffer(buffer, bytesToRead),
-        [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
-        if (error) {
-            pm.setError(Solace::Error(error.message(), error.value()));
-        } else {
-            buffer.advance(length);
-            pm.setValue(length);
-        }
-	});
-
-	return f;
+    return _pimpl->asyncRead(buffer, bytesToRead);
 }
 
 
-Future<SerialChannel::size_type> SerialChannel::asyncWrite(ByteBuffer& buffer, size_type bytesToWrite) {
-    Promise<size_type> promise;
-    auto f = promise.getFuture();
-
-    _serial.async_read_some(asio_buffer(buffer, bytesToWrite),
-        [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
-        if (error) {
-            pm.setError(Solace::Error(error.message(), error.value()));
-        } else {
-            buffer.advance(length);
-            pm.setValue(length);
-        }
-	});
-
-	return f;
+Future<void> SerialChannel::asyncWrite(ByteBuffer& buffer, size_type bytesToWrite) {
+    return _pimpl->asyncWrite(buffer, bytesToWrite);
 }

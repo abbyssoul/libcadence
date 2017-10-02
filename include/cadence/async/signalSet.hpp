@@ -28,40 +28,32 @@ namespace cadence { namespace async {
 class SignalSet {
 public:
 
-	~SignalSet() = default;
+    ~SignalSet();
 
     SignalSet(const SignalSet& rhs) = delete;
-
     SignalSet& operator= (const SignalSet& rhs) = delete;
 
     SignalSet(EventLoop& ioContext, std::initializer_list<int> signal);
 
-    /* FIXME: Need to patch asio::signal_set to be movable
     SignalSet(SignalSet&& rhs);
 
     SignalSet& operator= (SignalSet&& rhs) noexcept {
         return swap(rhs);
     }
 
-    SignalSet& swap(SignalSet& rhs) noexcept {
-        using std::swap;
-
-        return rhs;
-    }
-    */
+    SignalSet& swap(SignalSet& rhs) noexcept;
 
     Solace::Future<int> asyncWait();
 
 private:
-    asio::signal_set _signals;
+    class SignalSetImpl;
+    std::unique_ptr<SignalSetImpl> _pimpl;
 };
 
 
-/* FIXME: Need to patch asio::signal_set to be movable
 inline void swap(SignalSet& lhs, SignalSet& rhs) noexcept {
     lhs.swap(rhs);
 }
-*/
 
 }  // End of namespace async
 }  // End of namespace cadence

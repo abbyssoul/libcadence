@@ -18,8 +18,7 @@
 #define CADENCE_ASYNC_TCPSOCKET_HPP
 
 #include "cadence/async/channel.hpp"
-
-#include <solace/string.hpp>
+#include "cadence/ipendpoint.hpp"
 
 
 namespace cadence { namespace async {
@@ -27,21 +26,15 @@ namespace cadence { namespace async {
 /**
  * An async wrapper for the POSIX TcpSocket
  */
-class TcpSocket {
-public:
-    typedef Solace::String endpoint_type;
-
+class TcpSocket : public Channel {
 public:
 
-    ~TcpSocket() = default;
-
-    TcpSocket(EventLoop& eventLoop, Solace::uint16 port);
-
-    TcpSocket(const TcpSocket& rhs) = delete;
-
-    TcpSocket& operator= (const TcpSocket& rhs) = delete;
+    ~TcpSocket();
 
     TcpSocket(EventLoop& ioContext);
+
+    TcpSocket(const TcpSocket& rhs) = delete;
+    TcpSocket& operator= (const TcpSocket& rhs) = delete;
 
     TcpSocket(TcpSocket&& rhs);
 
@@ -49,35 +42,13 @@ public:
         return swap(rhs);
     }
 
-    TcpSocket& swap(TcpSocket& rhs) noexcept {
-        using std::swap;
-        swap(_socket, rhs._socket);
+    TcpSocket& swap(TcpSocket& rhs) noexcept;
 
-        return *this;
-    }
+    using Channel::asyncRead;
+    using Channel::asyncWrite;
 
-	void connect(endpoint_type server);
 
-    Solace::Future<void> asyncConnect(const endpoint_type& endpoint);
-
-    void cancel();
-
-    void close();
-
-    bool isOpen();
-
-    bool isClosed();
-
-	/**
-     * Post an async read request to read data from this IO object into the given buffer.
-     * This method reads the data until the provided destination buffer is full.
-     *
-     * @param dest The provided destination buffer to read data into.
-     * @return A future that will be resolved one the buffer has been filled.
-     */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest) {
-        return asyncRead(dest, dest.remaining());
-    }
+    Solace::Future<void> asyncConnect(const IPEndpoint& endpoint);
 
     /**
      * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -88,18 +59,7 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, std::size_t bytesToRead);
-
-    /**
-     * Post an async write request to write specified amount of data into this IO object.
-     * This method writes whole content of the provided buffer into the IO objec.
-     *
-     * @param src The provided source buffer to read data from.
-     * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
-     */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src) {
-        return asyncWrite(src, src.remaining());
-    }
+    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) override;
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -110,14 +70,58 @@ public:
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, std::size_t bytesToWrite);
+    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+
+    /**
+     * Cancel all asynchronous operations associated with the socket.
+     */
+    void cancel();
+
+    /**
+     * Close the socket.
+     */
+    void close();
+
+    /**
+     * Connect the socket to the specified endpoint syncroniosly.
+     * @param endpoint
+     */
+    void connect(const IPEndpoint& endpoint);
+
+    /**
+     * Determine whether the socket is open.
+     * @return True if socket is opened.
+     */
+    bool isOpen();
+
+    /**
+     * Determine whether the socket is closed.
+     * @return True if socket is NOT opened.
+     */
+    bool isClosed();
+
+    /**
+     * Get the local endpoint of the socket.
+     * @return Local endpoint this socket is bound to.
+     */
+    IPEndpoint getLocalEndpoint() const;
+
+    /**
+     * Get the remote endpoint of the socket.
+     * @return Remote endpoint this socket is connected to if any.
+     */
+    IPEndpoint getRemoteEndpoint() const;
+
+    /**
+     * Disable sends or receives on the socket.
+     */
+    void shutdown();
 
 private:
 
     friend class TcpAcceptor;
-
-    asio::ip::tcp::socket   _socket;
-    Solace::uint16          _port;
+    class TcpSocketImpl;
+    std::unique_ptr<TcpSocketImpl> _pimpl;
 };
 
 
@@ -126,7 +130,7 @@ private:
 class TcpAcceptor {
 public:
 
-    ~TcpAcceptor() = default;
+    ~TcpAcceptor();
 
     TcpAcceptor(EventLoop& ioContext, Solace::uint16 port);
 
@@ -142,12 +146,7 @@ public:
         return swap(rhs);
     }
 
-    TcpAcceptor& swap(TcpAcceptor& rhs) noexcept {
-        using std::swap;
-        swap(_acceptor, rhs._acceptor);
-
-        return *this;
-    }
+    TcpAcceptor& swap(TcpAcceptor& rhs) noexcept;
 
     bool isOpen();
     bool isClosed();
@@ -158,15 +157,15 @@ public:
     Solace::Future<void> asyncAccept(TcpSocket& socket);
 
 
-    template <typename SettableSocketOption>
-    void setOption(const SettableSocketOption& option) {
-        _acceptor.set_option(option);
-    }
+//    template <typename SettableSocketOption>
+//    void setOption(const SettableSocketOption& option) {
+//        _acceptor.set_option(option);
+//    }
 
-    template <typename GettableSocketOption>
-    void getOption(GettableSocketOption& option) {
-        _acceptor.get_option(option);
-    }
+//    template <typename GettableSocketOption>
+//    void getOption(GettableSocketOption& option) {
+//        _acceptor.get_option(option);
+//    }
 
     bool nonBlocking();
     bool nativeNonBlocking();
@@ -177,7 +176,9 @@ public:
 
 private:
 
-    asio::ip::tcp::acceptor _acceptor;
+    class AcceptorImpl;
+    std::unique_ptr<AcceptorImpl> _pimpl;
+
 };
 
 

@@ -183,10 +183,42 @@ public:
         ~Response();
     };
 
+    /**
+     * Get size in bytes of the mandatory protocol message header.
+     * @see MessageHeader
+     * @return Size in bytes of the mandatory protocol message header.
+     */
+    static constexpr size_type headerSize() noexcept {
+        // Note: can't use sizeof(MessageHeader) due to padding
+        return  sizeof(MessageHeader::size) +
+                sizeof(MessageHeader::type) +
+                sizeof(MessageHeader::tag);
+    }
+
 
 public:
 
-    explicit P9Protocol(size_type maxMassageSize = MAX_MESSAGE_SIZE);
+    P9Protocol(size_type maxMassageSize = MAX_MESSAGE_SIZE,
+               const Solace::String& version = PROTOCOL_VERSION);
+
+
+    size_type maxPossibleMessageSize() const noexcept {
+        return _maxMassageSize;
+    }
+
+    size_type maxNegotiatedMessageSize() const noexcept {
+        return _maxNegotiatedMessageSize;
+    }
+
+    size_type maxNegotiatedMessageSize(size_type newMessageSize);
+
+    const Solace::String& getNegotiatedVersion() const noexcept {
+        return _negotiatedVersion;
+    }
+
+    void setNegotiatedVersion(const Solace::String& version) noexcept {
+        _negotiatedVersion = version;
+    }
 
     //---------------------------------------------------------
     // Create protocol requests
@@ -226,23 +258,6 @@ public:
     Tag createWriteStatRequest(Tag tag, Solace::ByteBuffer& dest,
                                fid_type fid, const Stat& stat);
 
-
-    size_type maxPossibleMessageSize() const noexcept {
-        return _maxMassageSize;
-    }
-
-    size_type maxNegotiatedMessageSize() const noexcept {
-        return _maxNegotiatedMessageSize;
-    }
-
-    size_type maxNegotiatedMessageSize(size_type newMessageSize);
-
-    static constexpr size_type headerSize() noexcept {
-        // Note: can't use sizeof(MessageHeader) due to padding
-        return  sizeof(MessageHeader::size) +
-                sizeof(MessageHeader::type) +
-                sizeof(MessageHeader::tag);
-    }
 
     Solace::Result<MessageHeader, Solace::Error>
     parseMessageHeader(Solace::ByteBuffer& buffer) const;
@@ -304,7 +319,9 @@ private:
 
     size_type   _maxMassageSize;
     size_type   _maxNegotiatedMessageSize;
-    Tag    _currentTag;
+
+    Solace::String _initialVersion;
+    Solace::String _negotiatedVersion;
 };
 
 }  // end of namespace cadence

@@ -427,7 +427,7 @@ TEST(P9p2000x, parseReadRespose) {
 
     auto response = message.moveResult();
     EXPECT_EQ(dataLen, response.read.data.size());
-    EXPECT_TRUE(memcmp(response.read.data.dataAddress(), messageData, dataLen) == 0);
+    EXPECT_EQ(0, memcmp(response.read.data.dataAddress(), messageData, dataLen));
 }
 
 

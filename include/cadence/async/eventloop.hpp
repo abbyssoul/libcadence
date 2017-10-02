@@ -21,9 +21,6 @@
 #include <solace/future.hpp>
 #include <solace/io/selector.hpp>
 
-#include "asio.hpp"
-
-
 namespace cadence { namespace async {
 
 /**
@@ -40,22 +37,18 @@ public:
 
 public:
 
-    ~EventLoop() = default;
+    ~EventLoop();
 
-	EventLoop() = default;
+    EventLoop();
 
     EventLoop(const EventLoop& rhs) = delete;
-
     EventLoop& operator= (const EventLoop& rhs) = delete;
 
     EventLoop& operator= (EventLoop&& rhs) noexcept {
         return swap(rhs);
     }
 
-    EventLoop& swap(EventLoop& rhs) noexcept {
-        using std::swap;
-        return rhs;
-    }
+    EventLoop& swap(EventLoop& rhs) noexcept;
 
     bool poll();
 
@@ -71,20 +64,13 @@ public:
 
     void reset();
 
-    asio::io_service& getIOService() noexcept {
-        return _io_service;
-    }
+    void* getIOService() noexcept;
 
 private:
 
-	asio::io_service _io_service;
+    class EventloopImpl;
+    std::unique_ptr<EventloopImpl> _pimpl;
 };
-
-
-inline
-asio::mutable_buffers_1 asio_buffer(Solace::ByteBuffer& dest, std::size_t size_in_bytes) ASIO_NOEXCEPT {
-    return asio::buffer(dest.viewRemaining().slice(0, size_in_bytes).dataAddress(), size_in_bytes);
-}
 
 }  // End of namespace async
 }  // End of namespace cadence

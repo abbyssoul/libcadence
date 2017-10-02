@@ -72,9 +72,9 @@ TEST(TestAsyncPipe, testAsyncRead) {
     // Check that we read as much as was written
     ASSERT_FALSE(messageBuffer.hasRemaining());
     ASSERT_EQ(messageLen, messageBuffer.position());
-
     ASSERT_EQ(messageLen, readBuffer.position());
 }
+
 
 TEST(TestAsyncPipe, testAsyncReadWrite) {
     EventLoop iocontext;
@@ -94,7 +94,6 @@ TEST(TestAsyncPipe, testAsyncReadWrite) {
         readComplete = true;
     });
 
-
     iopipe.asyncWrite(messageBuffer).then([&writeComplete]() {
         writeComplete = true;
     });
@@ -108,6 +107,5 @@ TEST(TestAsyncPipe, testAsyncReadWrite) {
     // Check that we read as much as was written
     ASSERT_FALSE(messageBuffer.hasRemaining());
     ASSERT_EQ(messageLen, messageBuffer.position());
-
     ASSERT_EQ(messageLen, readBuffer.position());
 }

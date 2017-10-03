@@ -951,7 +951,7 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseMessage(const MessageHeader& header, ByteBuffer& data) const {
+P9Protocol::parseResponse(const MessageHeader& header, ByteBuffer& data) const {
     const auto expectedData = header.size - headerSize();
 
     // Message data sanity check

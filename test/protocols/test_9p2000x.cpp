@@ -231,7 +231,7 @@ TEST(P9_2000, parseIncorrectlySizedSmallerResponse) {
     auto header = proc.parseMessageHeader(buffer.flip());
     ASSERT_TRUE(header.isOk());
 
-    auto message = proc.parseMessage(header.unwrap(), buffer);
+    auto message = proc.parseResponse(header.unwrap(), buffer);
     ASSERT_TRUE(message.isError());
 }
 
@@ -249,7 +249,7 @@ TEST(P9_2000, parseIncorrectlySizedLargerResponse) {
     auto header = proc.parseMessageHeader(buffer.flip());
     ASSERT_TRUE(header.isOk());
 
-    auto message = proc.parseMessage(header.unwrap(), buffer);
+    auto message = proc.parseResponse(header.unwrap(), buffer);
     ASSERT_TRUE(message.isError());
 }
 
@@ -318,7 +318,7 @@ TEST_F(P9Messages, createVersionRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RVersion, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -344,7 +344,7 @@ TEST_F(P9Messages, parseVersionRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RVersion, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -392,7 +392,7 @@ TEST_F(P9Messages, createAuthRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RAuth, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -420,7 +420,7 @@ TEST_F(P9Messages, parseAuthRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RAuth, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -445,7 +445,7 @@ TEST_F(P9Messages, createErrorRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RError, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isError());
 
     auto response = message.moveError();
@@ -473,7 +473,7 @@ TEST_F(P9Messages, parseErrorRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RError, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isError());
 
     auto response = message.moveError();
@@ -514,7 +514,7 @@ TEST_F(P9Messages, createFlushRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RFlush, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -534,7 +534,7 @@ TEST_F(P9Messages, parseFlushRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RFlush, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -577,7 +577,7 @@ TEST_F(P9Messages, createAttachRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RAttach, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -603,7 +603,7 @@ TEST_F(P9Messages, parseAttachRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RAttach, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -650,7 +650,7 @@ TEST_F(P9Messages, createOpenRespose) {
     ASSERT_EQ(P9Protocol::MessageType::ROpen, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -680,7 +680,7 @@ TEST_F(P9Messages, parseOpenRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::ROpen, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -730,7 +730,7 @@ TEST_F(P9Messages, createCreateRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RCreate, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -760,7 +760,7 @@ TEST_F(P9Messages, parseCreateRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RCreate, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -806,7 +806,7 @@ TEST_F(P9Messages, createReadRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RRead, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -835,7 +835,7 @@ TEST_F(P9Messages, parseReadRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RRead, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -880,7 +880,7 @@ TEST_F(P9Messages, createWriteRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RWrite, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -905,7 +905,7 @@ TEST_F(P9Messages, parseWriteRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RWrite, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -944,7 +944,7 @@ TEST_F(P9Messages, createClunkRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RClunk, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -963,7 +963,7 @@ TEST_F(P9Messages, parseClunkRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RClunk, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -999,7 +999,7 @@ TEST_F(P9Messages, createRemoveRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RRemove, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -1018,7 +1018,7 @@ TEST_F(P9Messages, parseRemoveRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RRemove, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -1070,7 +1070,7 @@ TEST_F(P9Messages, createStatRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RStat, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -1113,7 +1113,7 @@ TEST_F(P9Messages, parseStatRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RStat, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -1168,7 +1168,7 @@ TEST_F(P9Messages, createWStatRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RWStat, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -1187,7 +1187,7 @@ TEST_F(P9Messages, parseWStatRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RWStat, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -1231,7 +1231,7 @@ TEST_F(P9Messages, createSessionRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RSession, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -1250,7 +1250,7 @@ TEST_F(P9Messages, parseSessionRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RSession, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 }
 
@@ -1296,7 +1296,7 @@ TEST_F(P9Messages, createShortReadRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RSRead, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -1325,7 +1325,7 @@ TEST_F(P9Messages, parseShortReadRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RSRead, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -1376,7 +1376,7 @@ TEST_F(P9Messages, createShortWriteRespose) {
     ASSERT_EQ(P9Protocol::MessageType::RSWrite, header.type);
 
     // Make sure we can parse the message back.
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();
@@ -1401,7 +1401,7 @@ TEST_F(P9Messages, parseShortWriteRespose) {
     auto header = headerResult.unwrap();
     ASSERT_EQ(P9Protocol::MessageType::RSWrite, header.type);
 
-    auto message = proc.parseMessage(header, _buffer);
+    auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
 
     auto response = message.moveResult();

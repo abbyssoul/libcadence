@@ -448,7 +448,7 @@ public:
     parseMessageHeader(Solace::ByteBuffer& buffer) const;
 
     Solace::Result<Response, Solace::Error>
-    parseMessage(const MessageHeader& header, Solace::ByteBuffer& data) const;
+    parseResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
 
     Solace::Result<Request, Solace::Error>
     parseRequest(const MessageHeader& header, Solace::ByteBuffer& data) const;

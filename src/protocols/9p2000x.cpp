@@ -121,20 +121,23 @@ public:
     }
 
 
-    P9Encoder& encode(uint8 value) { _dest << value; return (*this); }
+    P9Encoder& encode(uint8 value) {
+        _dest.writeLE(value);
+        return (*this);
+    }
 
     P9Encoder& encode(uint16 value) {
-        _dest << value;
+        _dest.writeLE(value);
         return (*this);
     }
 
     P9Encoder& encode(uint32 value) {
-        _dest << value;
+        _dest.writeLE(value);
         return (*this);
     }
 
     P9Encoder& encode(uint64 value) {
-        _dest << value;
+        _dest.writeLE(value);
         return (*this);
     }
 
@@ -210,28 +213,28 @@ public:
     {}
 
     P9Decoder& read(uint8* dest) {
-        _src >> *dest;
+        _src.readLE(*dest);
         return *this;
     }
 
     P9Decoder& read(uint16* dest) {
-        _src >> *dest;
+        _src.readLE(*dest);
         return *this;
     }
 
     P9Decoder& read(uint32* dest) {
-        _src >> *dest;
+        _src.readLE(*dest);
         return *this;
     }
 
     P9Decoder& read(uint64* dest) {
-        _src >> *dest;
+        _src.readLE(*dest);
         return *this;
     }
 
     P9Decoder& read(String* dest) {
         uint16 dataSize = 0;
-        _src >> dataSize;
+        _src.readLE(dataSize);
 
         std::string buff;
         buff.reserve(dataSize);
@@ -920,7 +923,7 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
         return Err(Error("Ill-formed message header. Not enough data to read a header"));
 
     MessageHeader header;
-    buffer >> header.size;
+    buffer.readLE(header.size);
 
     // Sanity checks:
     // It is a serious error if server responded with the message of a size bigger than negotiated one.
@@ -932,7 +935,7 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
 
     // Read message type:
     byte messageBytecode;
-    buffer >> messageBytecode;
+    buffer.readLE(messageBytecode);
     // don't want any funny messages.
 //    Solace::assertIndexInRange(messageBytecode,
 //                               static_cast<byte>(MessageType::_beginSupportedMessageCode),
@@ -944,7 +947,7 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
 
     // Read message tag. Tags are provided by the client and can not be checked by the message parser.
     // Unless we are provided with the expected tag...
-    buffer >> header.tag;
+    buffer.readLE(header.tag);
 
     return Ok(header);
 }

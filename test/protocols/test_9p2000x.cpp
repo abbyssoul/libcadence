@@ -288,7 +288,9 @@ TEST_F(P9Messages, createVersionRequest) {
     const uint32 versionStringLen = static_cast<uint32>(testVersion.size());
 
     P9Protocol proc;
-    proc.createVersionRequest(0, _buffer, testVersion);
+    P9Protocol::RequestBuilder(_buffer)
+            .version(testVersion);
+
     ASSERT_EQ(proc.headerSize() + 4 + 2 + versionStringLen, _buffer.position());
 
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
@@ -357,7 +359,8 @@ TEST_F(P9Messages, parseVersionRespose) {
 TEST_F(P9Messages, createAuthRequest) {
     P9Protocol proc;
 
-    proc.createAuthRequest(1, _buffer, 312, "User mcUsers", "Somewhere near");
+    P9Protocol::RequestBuilder(_buffer)
+        .auth(312, "User mcUsers", "Somewhere near");
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -485,7 +488,8 @@ TEST_F(P9Messages, parseErrorRespose) {
 TEST_F(P9Messages, createFlushRequest) {
     P9Protocol proc;
 
-    proc.createFlushRequest(1, _buffer, 7711);
+    P9Protocol::RequestBuilder(_buffer)
+            .flush(7711);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -542,7 +546,8 @@ TEST_F(P9Messages, parseFlushRespose) {
 TEST_F(P9Messages, createAttachRequest) {
     P9Protocol proc;
 
-    proc.createAttachRequest(1, _buffer, 3310, 1841, "McFace", "close to u");
+    P9Protocol::RequestBuilder(_buffer)
+            .attach(3310, 1841, "McFace", "close to u");
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -616,7 +621,8 @@ TEST_F(P9Messages, parseAttachRespose) {
 TEST_F(P9Messages, createOpenRequest) {
     P9Protocol proc;
 
-    proc.createOpenRequest(1, _buffer, 517, 11);
+    P9Protocol::RequestBuilder(_buffer)
+            .open(517, 11);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -695,7 +701,8 @@ TEST_F(P9Messages, parseOpenRespose) {
 TEST_F(P9Messages, createCreateRequest) {
     P9Protocol proc;
 
-    proc.createCreateRequest(1, _buffer, 1734, "mcFance", 11, 077);
+    P9Protocol::RequestBuilder(_buffer)
+            .create(1734, "mcFance", 11, 077);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -774,7 +781,8 @@ TEST_F(P9Messages, parseCreateRespose) {
 TEST_F(P9Messages, createReadRequest) {
     P9Protocol proc;
 
-    proc.createReadRequest(1, _buffer, 7234, 18, 772);
+    P9Protocol::RequestBuilder(_buffer)
+            .read(7234, 18, 772);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -849,7 +857,9 @@ TEST_F(P9Messages, createWriteRequest) {
 
     const char messageData[] = "This is a very important data d-_^b";
     auto data = wrapMemory(messageData);
-    proc.createWriteRequest(1, _buffer, 15927, 98, data);
+
+    P9Protocol::RequestBuilder(_buffer)
+            .write(15927, 98, data);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -917,7 +927,8 @@ TEST_F(P9Messages, parseWriteRespose) {
 TEST_F(P9Messages, createClunkRequest) {
     P9Protocol proc;
 
-    proc.createClunkRequest(1, _buffer, 37509);
+    P9Protocol::RequestBuilder(_buffer)
+            .clunk(37509);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -972,7 +983,8 @@ TEST_F(P9Messages, parseClunkRespose) {
 TEST_F(P9Messages, createRemoveRequest) {
     P9Protocol proc;
 
-    proc.createRemoveRequest(1, _buffer, 54329);
+    P9Protocol::RequestBuilder(_buffer)
+            .remove(54329);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -1027,7 +1039,8 @@ TEST_F(P9Messages, parseRemoveRespose) {
 TEST_F(P9Messages, createStatRequest) {
     P9Protocol proc;
 
-    proc.createStatRequest(1, _buffer, 7872);
+    P9Protocol::RequestBuilder(_buffer)
+            .stat(7872);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -1139,7 +1152,8 @@ TEST_F(P9Messages, createWStatRequest) {
     stat.type = 1;
     stat.uid = "Userface McUse";
 
-    proc.createWriteStatRequest(1, _buffer, 8193, stat);
+    P9Protocol::RequestBuilder(_buffer)
+            .writeStat(8193, stat);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -1200,7 +1214,8 @@ TEST_F(P9Messages, createSessionRequest) {
     const auto data = wrapMemory(sessionKey);
 
     P9Protocol proc;
-    proc.createSessionRequest(0, _buffer, data);
+    P9Protocol::RequestBuilder(_buffer)
+            .session(data);
 
     ASSERT_EQ(proc.headerSize() + 8, _buffer.position());
 
@@ -1260,7 +1275,8 @@ TEST_F(P9Messages, createShortReadRequest) {
     const auto path = Path::parse("some/wierd/place");
 
     P9Protocol proc;
-    proc.createShortReadRequest(0, _buffer, 32, path);
+    P9Protocol::RequestBuilder(_buffer)
+            .shortRead(32, path);
 
     ASSERT_EQ(proc.headerSize() + sizeof(P9Protocol::fid_type) + sizeof (uint16)
               + 3*sizeof (uint16) + (4 + 5 + 5), _buffer.position());
@@ -1340,7 +1356,8 @@ TEST_F(P9Messages, createShortWriteRequest) {
     auto data = wrapMemory(messageData);
 
     P9Protocol proc;
-    proc.createShortWriteRequest(0, _buffer, 32, path, data);
+    P9Protocol::RequestBuilder(_buffer)
+            .shortWrite(32, path, data);
 
     ASSERT_EQ(proc.headerSize() + sizeof(P9Protocol::fid_type) + sizeof (uint16)
               + 3*sizeof (uint16) + (4 + 5 + 5) +

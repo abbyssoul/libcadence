@@ -23,7 +23,7 @@ namespace cadence {
 /**
  * A protocol a collection of well known methods to create protocol messages.
  * Essantially it is a factory of message formatted bytes.
- * This bytes - or message frame can be written into a network to communicate with other peers that
+ * This bytes - or message frame - can be written into a network to communicate with other peers that
  * understand this protocol.
  *
  */
@@ -109,6 +109,9 @@ public:
         Solace::uint64  path;
     };
 
+    /**
+     * Stat about a file on the server.
+     */
     struct Stat {
         Solace::uint16  size;
         Solace::uint16  type;
@@ -124,10 +127,13 @@ public:
         Solace::String  muid;
     };
 
+    /**
+     * Common header that all messages have.
+     */
     struct MessageHeader {
-        size_type       size;
-        MessageType     type;
-        Tag        tag;
+        size_type       size;   //!< Size of the message including size of the header and size field itself.
+        MessageType     type;   //!< Type of the message. @see MessageType.
+        Tag             tag;    //!< Message tag for concurent messages.
     };
 
 
@@ -247,6 +253,58 @@ public:
 
         ~Request();
     };
+
+    /**
+     * Helper class to build Request messages.
+     */
+    class RequestBuilder {
+    public:
+
+        RequestBuilder(Solace::ByteBuffer& buffer) :
+            _tag(1),
+            _buffer(buffer)
+        {}
+
+        Solace::ByteBuffer& buffer() {
+            return _buffer;
+        }
+
+        Solace::ByteBuffer& build();
+
+        RequestBuilder& tag(Tag value) {
+            _tag = value;
+            return (*this);
+        }
+
+        RequestBuilder& version(const Solace::String& version = PROTOCOL_VERSION,
+                                size_type maxMessageSize = MAX_MESSAGE_SIZE);
+        RequestBuilder& auth(fid_type afid, const Solace::String& userName, const Solace::String& attachName);
+        RequestBuilder& flush(Tag oldTransation);
+        RequestBuilder& attach(fid_type fid, fid_type afid,
+                                const Solace::String& userName, const Solace::String& attachName);
+        RequestBuilder& walk(fid_type fid, fid_type nfid, const Solace::Path& path);
+        RequestBuilder& open(fid_type fid, Solace::byte mode);
+        RequestBuilder& create(fid_type fid,
+                                const Solace::String& name,
+                                Solace::uint32 permissions,
+                                Solace::byte mode);
+        RequestBuilder& read(fid_type fid, Solace::uint64 offset, size_type count);
+        RequestBuilder& write(fid_type fid, Solace::uint64 offset, const Solace::ImmutableMemoryView& data);
+        RequestBuilder& clunk(fid_type fid);
+        RequestBuilder& remove(fid_type fid);
+        RequestBuilder& stat(fid_type fid);
+        RequestBuilder& writeStat(fid_type fid, const Stat& stat);
+
+        /* 9P2000.e extention */
+        RequestBuilder& session(const Solace::ImmutableMemoryView& key);
+        RequestBuilder& shortRead(fid_type rootFid, const Solace::Path& path);
+        RequestBuilder& shortWrite(fid_type rootFid, const Solace::Path& path, const Solace::ImmutableMemoryView& data);
+
+    private:
+        Tag                     _tag;
+        Solace::ByteBuffer&     _buffer;
+    };
+
 
     struct Response {
 
@@ -395,54 +453,6 @@ public:
     //---------------------------------------------------------
     // Create protocol requests
     //---------------------------------------------------------
-    Tag createVersionRequest(Tag tag, Solace::ByteBuffer& dest, const Solace::String& version = PROTOCOL_VERSION);
-
-    Tag createAuthRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type afid, const Solace::String& userName, const Solace::String& attachName);
-
-    Tag createAttachRequest(Tag tag, Solace::ByteBuffer& dest,
-                                 fid_type fid, fid_type afid,
-                                 const Solace::String& userName, const Solace::String& attachName);
-
-    Tag createClunkRequest(Tag tag, Solace::ByteBuffer& dest, fid_type fid);
-    Tag createFlushRequest(Tag tag, Solace::ByteBuffer& dest, Tag oldTransation);
-    Tag createRemoveRequest(Tag tag, Solace::ByteBuffer& dest, fid_type fid);
-
-    Tag createOpenRequest(Tag tag, Solace::ByteBuffer& dest, fid_type fid, Solace::byte mode);
-    Tag createCreateRequest(Tag tag, Solace::ByteBuffer& dest,
-                                 fid_type fid,
-                                 const Solace::String& name,
-                                 Solace::uint32 permissions,
-                                 Solace::byte mode);
-
-    Tag createReadRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type fid, Solace::uint64 offset, size_type count);
-
-    Tag createWriteRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type fid, Solace::uint64 offset, const Solace::ImmutableMemoryView& data);
-
-    Tag createWalkRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type fid, fid_type nfid, const Solace::Path& path);
-
-    Tag createStatRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type fid);
-
-    Tag createWriteStatRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type fid, const Stat& stat);
-
-
-    /**
-     * 9P2000.e extension
-     */
-    Tag createSessionRequest(Tag tag, Solace::ByteBuffer& dest,
-                               const Solace::ImmutableMemoryView& key);
-
-    Tag createShortReadRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type fid, const Solace::Path& path);
-
-    Tag createShortWriteRequest(Tag tag, Solace::ByteBuffer& dest,
-                               fid_type fid, const Solace::Path& path, const Solace::ImmutableMemoryView& data);
-
 
     Solace::Result<MessageHeader, Solace::Error>
     parseMessageHeader(Solace::ByteBuffer& buffer) const;

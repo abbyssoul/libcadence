@@ -100,13 +100,13 @@ StreamDomainSocket::~StreamDomainSocket()
 }
 
 StreamDomainSocket::StreamDomainSocket(EventLoop& ioContext) :
-    Channel(ioContext),
+    StreamSocket(ioContext),
     _pimpl(std::make_unique<StreamDomainSocketImpl>(ioContext.getIOService()))
 {
 }
 
 StreamDomainSocket::StreamDomainSocket(StreamDomainSocket&& rhs) :
-    Channel(std::move(rhs)),
+    StreamSocket(std::move(rhs)),
     _pimpl(std::move(rhs._pimpl))
 {
 }
@@ -120,14 +120,14 @@ StreamDomainSocket& StreamDomainSocket::swap(StreamDomainSocket& rhs) noexcept {
 }
 
 
-void StreamDomainSocket::connect(endpoint_type server) {
-    _pimpl->connect(server);
+void StreamDomainSocket::connect(const NetworkEndpoint& endpoint) {
+    _pimpl->connect(endpoint.toString());
 }
 
 
 Future<void>
-StreamDomainSocket::asyncConnect(const endpoint_type& endpoint) {
-    return _pimpl->asyncConnect(endpoint);
+StreamDomainSocket::asyncConnect(const NetworkEndpoint& endpoint) {
+    return _pimpl->asyncConnect(endpoint.toString());
 }
 
 
@@ -176,10 +176,11 @@ StreamDomainAcceptor::~StreamDomainAcceptor()
 }
 
 
-StreamDomainAcceptor::StreamDomainAcceptor(EventLoop& ioContext, const String& file) :
-    _pimpl(std::make_unique<AcceptorImpl>(ioContext.getIOService(), file.to_str()))
+StreamDomainAcceptor::StreamDomainAcceptor(EventLoop& ioContext, const UnixEndpoint& endpoint) :
+    _pimpl(std::make_unique<AcceptorImpl>(ioContext.getIOService(), endpoint.toString().to_str()))
 {
 }
+
 
 Future<void>
 StreamDomainAcceptor::asyncAccept(StreamDomainSocket& socket) {

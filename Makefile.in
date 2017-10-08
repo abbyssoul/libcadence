@@ -14,7 +14,7 @@ endif
 
 # Project directory layout
 TARGET_DIR = libs
-TARGET = $(TARGET_DIR)/lib$(PROJECT).a
+export TARGET = $(TARGET_DIR)/lib$(PROJECT).a
 
 export PUBLIC_HEADERS = include
 export BUILD_DIR = build
@@ -134,7 +134,7 @@ $(TARGET): $(obj)
 # Build examples
 #-------------------------------------------------------------------------------
 .PHONY: examples
-examples:
+examples: $(TARGET)
 	@$(MAKE) -C $(EXAMPLES_SRC_DIR) -f Makefile.in
 
 

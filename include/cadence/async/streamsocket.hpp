@@ -14,54 +14,50 @@
  *	ID:			$Id$
  ******************************************************************************/
 #pragma once
-#ifndef CADENCE_ASYNC_STREAMDOMAINSOCKET_HPP
-#define CADENCE_ASYNC_STREAMDOMAINSOCKET_HPP
+#ifndef CADENCE_ASYNC_STREAMSOCKET_HPP
+#define CADENCE_ASYNC_STREAMSOCKET_HPP
 
-#include "cadence/async/streamsocket.hpp"
-#include "cadence/unixDomainEndpoint.hpp"
+#include "cadence/async/channel.hpp"
+#include "cadence/networkEndpoint.hpp"
+
 
 
 namespace cadence { namespace async {
 
 /**
- * TODO(abbyssoul): document this class
+ * Base class for stream-oriented sockets
  */
-class StreamDomainSocket :
-        public StreamSocket {
+class StreamSocket :
+        public Channel {
 public:
 
-    ~StreamDomainSocket();
+    virtual ~StreamSocket() = default;
 
-    StreamDomainSocket(const StreamDomainSocket& rhs) = delete;
-    StreamDomainSocket& operator= (const StreamDomainSocket& rhs) = delete;
 
-    StreamDomainSocket(EventLoop& ioContext);
+    StreamSocket(EventLoop& ioContext) :
+        Channel(ioContext)
+    { }
 
-    StreamDomainSocket(StreamDomainSocket&& rhs);
-
-    StreamDomainSocket& operator= (StreamDomainSocket&& rhs) noexcept {
-        return swap(rhs);
-    }
-
-    StreamDomainSocket& swap(StreamDomainSocket& rhs) noexcept;
-
+    StreamSocket(StreamSocket&& rhs) :
+        Channel(std::move(rhs))
+    { }
 
     /**
      * Start an syncronous connection to the given endpoint.
      * This call will block until a connection is complete (either successfully or in an error)
      * @param endpoint An endpoint to connect to.
      */
-    void connect(const NetworkEndpoint& endpoint) override;
+    virtual void connect(const NetworkEndpoint& endpoint) = 0;
 
     /**
      * Start an asynchronous connection to the given endpoint.
      * @param endpoint An endpoint to connect to.
      * @return Future that is resolved when connection is establised or an error occured.
      */
-    Solace::Future<void> asyncConnect(const NetworkEndpoint& endpoint) override;
+    virtual Solace::Future<void> asyncConnect(const NetworkEndpoint& endpoint) = 0;
 
-    using StreamSocket::asyncRead;
-    using StreamSocket::asyncWrite;
+    using Channel::asyncRead;
+    using Channel::asyncWrite;
 
     /**
      * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -72,7 +68,7 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+    virtual Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) = 0;
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -83,36 +79,9 @@ public:
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
-
-protected:
-
-    friend class StreamDomainAcceptor;
-
-    class StreamDomainSocketImpl;
-    std::unique_ptr<StreamDomainSocketImpl> _pimpl;
+    virtual Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) = 0;
 };
-
-
-class StreamDomainAcceptor {
-public:
-    ~StreamDomainAcceptor();
-
-    StreamDomainAcceptor(EventLoop& ioContext, const UnixEndpoint& endpoint);
-
-    Solace::Future<void> asyncAccept(StreamDomainSocket& socket);
-
-private:
-
-    class AcceptorImpl;
-    std::unique_ptr<AcceptorImpl> _pimpl;
-};
-
-
-inline void swap(StreamDomainSocket& lhs, StreamDomainSocket& rhs) noexcept {
-    lhs.swap(rhs);
-}
 
 }  // End of namespace async
 }  // End of namespace cadence
-#endif  // CADENCE_ASYNC_STREAMDOMAINSOCKET_HPP
+#endif  // CADENCE_ASYNC_STREAMSOCKET_HPP

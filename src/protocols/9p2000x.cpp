@@ -19,10 +19,10 @@ using namespace cadence;
 
 
 
-const P9Protocol::size_type P9Protocol::MAX_MESSAGE_SIZE = 4*1024;      // 4k should be enough for everyone, am I right?
+const P9Protocol::size_type P9Protocol::MAX_MESSAGE_SIZE = 8*1024;      // 8k should be enough for everyone, am I right?
 const String                P9Protocol::PROTOCOL_VERSION = "9P2000.e";  // By default we want to talk via 9P2000.e proc
 const P9Protocol::Tag       P9Protocol::NO_TAG = static_cast<P9Protocol::Tag>(~0);
-const P9Protocol::fid_type  P9Protocol::NOFID = static_cast<P9Protocol::fid_type>(~0);
+const P9Protocol::Fid  P9Protocol::NOFID = static_cast<P9Protocol::Fid>(~0);
 
 
 // static const char* UNKNOWN_PROTOCOL_VERSION = "unknown";
@@ -131,15 +131,15 @@ private:
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseNoDataResponse(const MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) const {
-    Response fcall(header.type, header.tag);
+parseNoDataResponse(const P9Protocol::MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     return Ok(std::move(fcall));
 }
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseErrorResponse(const MessageHeader& SOLACE_UNUSED(header), ByteBuffer& data) const {
+parseErrorResponse(const P9Protocol::MessageHeader& SOLACE_UNUSED(header), ByteBuffer& data) {
     String errorMessage;
 
     P9Decoder(data)
@@ -150,8 +150,8 @@ P9Protocol::parseErrorResponse(const MessageHeader& SOLACE_UNUSED(header), ByteB
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseVersionResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseVersionResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.version.msize)
@@ -162,8 +162,8 @@ P9Protocol::parseVersionResponse(const MessageHeader& header, ByteBuffer& data) 
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseAuthResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseAuthResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.auth.qid);
@@ -173,8 +173,8 @@ P9Protocol::parseAuthResponse(const MessageHeader& header, ByteBuffer& data) con
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseAttachResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseAttachResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.attach.qid);
@@ -185,8 +185,8 @@ P9Protocol::parseAttachResponse(const MessageHeader& header, ByteBuffer& data) c
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseOpenResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseOpenResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.open.qid)
@@ -197,8 +197,8 @@ P9Protocol::parseOpenResponse(const MessageHeader& header, ByteBuffer& data) con
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseCreateResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseCreateResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.create.qid)
@@ -209,8 +209,8 @@ P9Protocol::parseCreateResponse(const MessageHeader& header, ByteBuffer& data) c
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseReadResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseReadResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.read.data);
@@ -220,8 +220,8 @@ P9Protocol::parseReadResponse(const MessageHeader& header, ByteBuffer& data) con
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseWriteResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseWriteResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.write.count);
@@ -231,8 +231,8 @@ P9Protocol::parseWriteResponse(const MessageHeader& header, ByteBuffer& data) co
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseStatResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseStatResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder(data)
             .read(&fcall.stat);
@@ -242,8 +242,8 @@ P9Protocol::parseStatResponse(const MessageHeader& header, ByteBuffer& data) con
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseWalkResponse(const MessageHeader& header, ByteBuffer& data) const {
-    Response fcall(header.type, header.tag);
+parseWalkResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+    P9Protocol::Response fcall(header.type, header.tag);
 
     P9Decoder decoder(data);
 
@@ -542,6 +542,10 @@ P9Protocol::parseResponse(const MessageHeader& header, ByteBuffer& data) const {
 
 Result<P9Protocol::Request, Solace::Error>
 P9Protocol::parseRequest(const MessageHeader& header, ByteBuffer& data) const {
+    // Just paranoid about huge messages exciding frame size getting through.
+    if (header.size > maxNegotiatedMessageSize())
+        return Err(Error("Ill-formed message: Declared frame size greater than negotiated message size"));
+
     const auto expectedData = header.size - headerSize();
 
     // Message data sanity check
@@ -549,28 +553,28 @@ P9Protocol::parseRequest(const MessageHeader& header, ByteBuffer& data) const {
     if (expectedData > data.remaining())
         return Err(Error("Ill-formed message: Declared frame size larger than message data received"));
 
-    // Make sure there is no extra data in the buffer.
+    // Make sure there is no extra unexpected data in the buffer.
     if (expectedData < data.remaining())
         return Err(Error("Ill-formed message: Declared frame size less than message data received"));
 
     switch (header.type) {
-    case MessageType::TVersion: return parseVersionRequest(header, data);
-    case MessageType::TAuth:    return parseAuthRequest(header,    data);
-    case MessageType::TFlush:   return parseFlushRequest(header,    data);
-    case MessageType::TAttach:  return parseAttachRequest(header,  data);
-    case MessageType::TWalk:    return parseWalkRequest(header,    data);
-    case MessageType::TOpen:    return parseOpenRequest(header,    data);
-    case MessageType::TCreate:  return parseCreateRequest(header,  data);
-    case MessageType::TRead:    return parseReadRequest(header,    data);
-    case MessageType::TWrite:   return parseWriteRequest(header,   data);
-    case MessageType::TClunk:   return parseClunkRequest(header,    data);
-    case MessageType::TRemove:  return parseRemoveRequest(header,    data);
-    case MessageType::TStat:    return parseStatRequest(header,    data);
-    case MessageType::TWStat:   return parseWStatRequest(header,    data);
-
-    case MessageType::TSession: return parseSessionRequest(header,    data);
+    case MessageType::TVersion: return parseVersionRequest(header,      data);
+    case MessageType::TAuth:    return parseAuthRequest(header,         data);
+    case MessageType::TFlush:   return parseFlushRequest(header,        data);
+    case MessageType::TAttach:  return parseAttachRequest(header,       data);
+    case MessageType::TWalk:    return parseWalkRequest(header,         data);
+    case MessageType::TOpen:    return parseOpenRequest(header,         data);
+    case MessageType::TCreate:  return parseCreateRequest(header,       data);
+    case MessageType::TRead:    return parseReadRequest(header,         data);
+    case MessageType::TWrite:   return parseWriteRequest(header,        data);
+    case MessageType::TClunk:   return parseClunkRequest(header,        data);
+    case MessageType::TRemove:  return parseRemoveRequest(header,       data);
+    case MessageType::TStat:    return parseStatRequest(header,         data);
+    case MessageType::TWStat:   return parseWStatRequest(header,        data);
+    /* 9P2000.e extension messages */
+    case MessageType::TSession: return parseSessionRequest(header,      data);
     case MessageType::TSRead:   return parseShortReadRequest(header,    data);
-    case MessageType::TSWrite:  return parseShortWriteRequest(header,    data);
+    case MessageType::TSWrite:  return parseShortWriteRequest(header,   data);
 
     default:
         return Err(Error("Failed to parse responce message: Unsupported message type"));
@@ -578,7 +582,7 @@ P9Protocol::parseRequest(const MessageHeader& header, ByteBuffer& data) const {
 }
 
 P9Protocol::size_type P9Protocol::maxNegotiatedMessageSize(size_type newMessageSize) {
-    Solace::assertIndexInRange(newMessageSize, 0, maxPossibleMessageSize());
+    Solace::assertIndexInRange(newMessageSize, 0, maxPossibleMessageSize() + 1);
     _maxNegotiatedMessageSize = std::min(newMessageSize, maxPossibleMessageSize());
 
     return _maxNegotiatedMessageSize;

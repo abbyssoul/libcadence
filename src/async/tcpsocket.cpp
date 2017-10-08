@@ -32,7 +32,7 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        _socket.async_receive(asio_buffer(dest, bytesToRead),
+        asio::async_read(_socket, asio_buffer(dest, bytesToRead),
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
                 pm.setError(Solace::Error(error.message(), error.value()));
@@ -50,7 +50,7 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        _socket.async_send(asio_buffer(src, bytesToWrite),
+        asio::async_write(_socket, asio_buffer(src, bytesToWrite),
             [pm = std::move(promise), &src](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
                 pm.setError(Solace::Error(error.message(), error.value()));
@@ -259,14 +259,14 @@ TcpSocket::~TcpSocket()
 
 
 TcpSocket::TcpSocket(EventLoop& ioContext) :
-    Channel(ioContext),
+    StreamSocket(ioContext),
     _pimpl(std::make_unique<TcpSocketImpl>(ioContext.getIOService()))
 {
 }
 
 
 TcpSocket::TcpSocket(TcpSocket&& rhs) :
-    Channel(std::move(rhs)),
+    StreamSocket(std::move(rhs)),
     _pimpl(std::move(rhs._pimpl))
 {
 }
@@ -290,9 +290,8 @@ TcpSocket::asyncWrite(ByteBuffer& src, size_type bytesToWrite) {
 }
 
 Future<void>
-TcpSocket::asyncConnect(const IPEndpoint& endpoint) {
-    return _pimpl->asyncConnect(endpoint);
-
+TcpSocket::asyncConnect(const NetworkEndpoint& endpoint) {
+    return _pimpl->asyncConnect(*static_cast<const IPEndpoint*>(&endpoint));
 }
 
 
@@ -304,8 +303,8 @@ void TcpSocket::close() {
     _pimpl->close();
 }
 
-void TcpSocket::connect(const IPEndpoint& endpoint) {
-    _pimpl->connect(endpoint);
+void TcpSocket::connect(const NetworkEndpoint& endpoint) {
+    _pimpl->connect(*static_cast<const IPEndpoint*>(&endpoint));
 }
 
 

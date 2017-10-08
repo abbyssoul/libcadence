@@ -19,6 +19,7 @@
 
 
 using namespace Solace;
+using namespace cadence;
 using namespace cadence::async;
 
 
@@ -40,7 +41,7 @@ protected:
 
 
 TEST_F(TestStreamDomainSocket, testAsyncReadWrite) {
-    String endpoint(testSocketName);
+    UnixEndpoint endpoint(testSocketName);
 
     StreamDomainAcceptor acceptor(iocontext, endpoint);
     StreamDomainSocket ioStreamServerSocket(iocontext);

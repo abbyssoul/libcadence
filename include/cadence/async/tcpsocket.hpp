@@ -17,7 +17,7 @@
 #ifndef CADENCE_ASYNC_TCPSOCKET_HPP
 #define CADENCE_ASYNC_TCPSOCKET_HPP
 
-#include "cadence/async/channel.hpp"
+#include "cadence/async/streamsocket.hpp"
 #include "cadence/ipendpoint.hpp"
 
 
@@ -26,7 +26,8 @@ namespace cadence { namespace async {
 /**
  * An async wrapper for the POSIX TcpSocket
  */
-class TcpSocket : public Channel {
+class TcpSocket :
+        public StreamSocket {
 public:
 
     ~TcpSocket();
@@ -44,11 +45,11 @@ public:
 
     TcpSocket& swap(TcpSocket& rhs) noexcept;
 
-    using Channel::asyncRead;
-    using Channel::asyncWrite;
+    using StreamSocket::asyncRead;
+    using StreamSocket::asyncWrite;
 
 
-    Solace::Future<void> asyncConnect(const IPEndpoint& endpoint);
+    Solace::Future<void> asyncConnect(const NetworkEndpoint& endpoint) override;
 
     /**
      * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -86,7 +87,7 @@ public:
      * Connect the socket to the specified endpoint syncroniosly.
      * @param endpoint
      */
-    void connect(const IPEndpoint& endpoint);
+    void connect(const NetworkEndpoint& endpoint) override;
 
     /**
      * Determine whether the socket is open.
@@ -126,7 +127,9 @@ private:
 
 
 
-
+/**
+ * TODO(abbyssoul): Document this class
+ */
 class TcpAcceptor {
 public:
 

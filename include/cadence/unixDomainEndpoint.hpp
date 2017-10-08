@@ -7,15 +7,15 @@
 *  Written by Ivan Ryabov <abbyssoul@gmail.com>
 */
 /*******************************************************************************
- * libcadence: IP Endpoint
- *	@file		cadence/ipendpoint.hpp
+ * libcadence: Unix Domain Endpoint type
+ *	@file		cadence/unixDomainEndpoint.hpp
  *	@author		$LastChangedBy$
  *	@date		$LastChangedDate$
  *	ID:			$Id$
  ******************************************************************************/
 #pragma once
-#ifndef CADENCE_IPENDPOINT_HPP
-#define CADENCE_IPENDPOINT_HPP
+#ifndef CADENCE_UNIXDOMAINENDPOINT_HPP
+#define CADENCE_UNIXDOMAINENDPOINT_HPP
 
 #include "networkEndpoint.hpp"
 
@@ -24,35 +24,24 @@
 namespace cadence {
 
 /**
- * TODO(abbyssoul): document this class
+ * An abstract class to represent network address.
  */
-class IPEndpoint :
+class UnixEndpoint :
         public NetworkEndpoint {
 public:
 
-    IPEndpoint(const Solace::String& address, Solace::uint16 port) :
-        _ipAddress(address),
-        _port(port)
-    {
-    }
-
-    const Solace::String& getAddress() const {
-        return _ipAddress;
-    }
-
-    Solace::uint16 getPort() const {
-        return _port;
-    }
-
+    UnixEndpoint(const Solace::String& str) :
+        _str(str)
+    {}
 
     //!< @see Solace::IFormattable::toString
-    Solace::String toString() const override;
+    Solace::String toString() const override {
+        return _str;
+    }
 
 private:
-    // FIXME: Should use IPAddress type instead of the String
-    Solace::String  _ipAddress;
-    Solace::uint16  _port;
+    const Solace::String _str;
 };
 
 }  // End of namespace cadence
-#endif  // CADENCE_IPENDPOINT_HPP
+#endif  // CADENCE_UNIXDOMAINENDPOINT_HPP

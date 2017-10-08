@@ -5,7 +5,7 @@ LOCAL_CPPFLAGS = $(patsubst -I%,-I../%,$(CPPFLAGS))
 LOCAL_LDFLAGS = $(patsubst -L%,-L../%,$(LDFLAGS))
 
 
-all: $(EXAMPLES_BIN)/async_serial
+all: $(EXAMPLES_BIN)/async_serial $(EXAMPLES_BIN)/async_client
 
 
 $(EXAMPLES_BUILD):
@@ -21,4 +21,8 @@ $(EXAMPLES_BUILD)/%.o: %.cpp
 
 # Async_serial
 $(EXAMPLES_BIN)/async_serial: $(EXAMPLES_BUILD)/async_serial.o $(EXAMPLES_BIN)
+	$(CXX) -o $@ $(LOCAL_CXXFLAGS) $< $(LOCAL_LDFLAGS) $(LDLIBS)
+
+# async_client
+$(EXAMPLES_BIN)/async_client: $(EXAMPLES_BUILD)/async_client.o $(EXAMPLES_BIN)
 	$(CXX) -o $@ $(LOCAL_CXXFLAGS) $< $(LOCAL_LDFLAGS) $(LDLIBS)

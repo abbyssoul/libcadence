@@ -31,7 +31,7 @@ class P9Protocol {
 public:
     typedef Solace::uint32 size_type;
     typedef Solace::uint16 Tag;
-    typedef Solace::uint32 fid_type;
+    typedef Solace::uint32 Fid;
 
     /**
      * Maximum frame size that can transmitted by the protocol.
@@ -48,7 +48,7 @@ public:
      * Special value of a message tag representing 'no tag'.
      */
     static const Tag NO_TAG;
-    static const fid_type NOFID;
+    static const Fid NOFID;
 
     enum Consts {
         MAX_WELEM = 16
@@ -147,7 +147,7 @@ public:
         };
 
         struct Auth {
-            fid_type        afid;
+            Fid        afid;
             Solace::String  uname;
             Solace::String  aname;
         };
@@ -157,56 +157,56 @@ public:
         };
 
         struct Attach {
-            fid_type        fid;
-            fid_type        afid;
+            Fid        fid;
+            Fid        afid;
             Solace::String  uname;
             Solace::String  aname;
         };
 
         struct Walk {
-            fid_type        fid;
-            fid_type        newfid;
+            Fid        fid;
+            Fid        newfid;
             Solace::Path    path;
         };
 
         struct Open {
-            fid_type        fid;
+            Fid        fid;
             Solace::uint8   mode;
         };
 
         struct Create {
-            fid_type        fid;
+            Fid        fid;
             Solace::String  name;
             Solace::uint32  perm;
             Solace::uint8   mode;
         };
 
         struct Read {
-            fid_type        fid;
+            Fid        fid;
             Solace::uint64  offset;
             Solace::uint32  count;
         };
 
         struct Write {
-            fid_type        fid;
+            Fid        fid;
             Solace::uint64  offset;
             Solace::ImmutableMemoryView data;
         };
 
         struct Clunk {
-            fid_type        fid;
+            Fid        fid;
         };
 
         struct Remove {
-            fid_type        fid;
+            Fid        fid;
         };
 
         struct StatRequest {
-            fid_type        fid;
+            Fid        fid;
         };
 
         struct WStat {
-            fid_type        fid;
+            Fid        fid;
             Stat            stat;
         };
 
@@ -216,12 +216,12 @@ public:
         };
 
         struct SRead {
-            fid_type        fid;
+            Fid        fid;
             Solace::Path    path;
         };
 
         struct SWrite {
-            fid_type        fid;
+            Fid        fid;
             Solace::Path    path;
             Solace::ImmutableMemoryView data;
         };
@@ -254,6 +254,7 @@ public:
         ~Request();
     };
 
+
     /**
      * Helper class to build Request messages.
      */
@@ -271,34 +272,47 @@ public:
 
         Solace::ByteBuffer& build();
 
+        /**
+         * Set response message tag
+         * @param value Tag of the response message.
+         * @return Ref to this for a fluent interface.
+         */
         RequestBuilder& tag(Tag value) {
             _tag = value;
             return (*this);
         }
 
+//        Tag tag() const { return _tag; }
+
+        /**
+         * Create a version request.
+         * @param version Suggested protocol version.
+         * @param maxMessageSize Suggest maximum size of the protocol message, including mandatory message header.
+         * @return Ref to this for fluent interface.
+         */
         RequestBuilder& version(const Solace::String& version = PROTOCOL_VERSION,
                                 size_type maxMessageSize = MAX_MESSAGE_SIZE);
-        RequestBuilder& auth(fid_type afid, const Solace::String& userName, const Solace::String& attachName);
+        RequestBuilder& auth(Fid afid, const Solace::String& userName, const Solace::String& attachName);
         RequestBuilder& flush(Tag oldTransation);
-        RequestBuilder& attach(fid_type fid, fid_type afid,
+        RequestBuilder& attach(Fid fid, Fid afid,
                                 const Solace::String& userName, const Solace::String& attachName);
-        RequestBuilder& walk(fid_type fid, fid_type nfid, const Solace::Path& path);
-        RequestBuilder& open(fid_type fid, Solace::byte mode);
-        RequestBuilder& create(fid_type fid,
+        RequestBuilder& walk(Fid fid, Fid nfid, const Solace::Path& path);
+        RequestBuilder& open(Fid fid, Solace::byte mode);
+        RequestBuilder& create(Fid fid,
                                 const Solace::String& name,
                                 Solace::uint32 permissions,
                                 Solace::byte mode);
-        RequestBuilder& read(fid_type fid, Solace::uint64 offset, size_type count);
-        RequestBuilder& write(fid_type fid, Solace::uint64 offset, const Solace::ImmutableMemoryView& data);
-        RequestBuilder& clunk(fid_type fid);
-        RequestBuilder& remove(fid_type fid);
-        RequestBuilder& stat(fid_type fid);
-        RequestBuilder& writeStat(fid_type fid, const Stat& stat);
+        RequestBuilder& read(Fid fid, Solace::uint64 offset, size_type count);
+        RequestBuilder& write(Fid fid, Solace::uint64 offset, const Solace::ImmutableMemoryView& data);
+        RequestBuilder& clunk(Fid fid);
+        RequestBuilder& remove(Fid fid);
+        RequestBuilder& stat(Fid fid);
+        RequestBuilder& writeStat(Fid fid, const Stat& stat);
 
         /* 9P2000.e extention */
         RequestBuilder& session(const Solace::ImmutableMemoryView& key);
-        RequestBuilder& shortRead(fid_type rootFid, const Solace::Path& path);
-        RequestBuilder& shortWrite(fid_type rootFid, const Solace::Path& path, const Solace::ImmutableMemoryView& data);
+        RequestBuilder& shortRead(Fid rootFid, const Solace::Path& path);
+        RequestBuilder& shortWrite(Fid rootFid, const Solace::Path& path, const Solace::ImmutableMemoryView& data);
 
     private:
         Tag                     _tag;
@@ -377,8 +391,8 @@ public:
     public:
 
         ResponseBuilder(Solace::ByteBuffer& buffer) :
-            _buffer(buffer),
-            _sizeMark(buffer.position())
+            _tag(1),
+            _buffer(buffer)
         {}
 
         Solace::ByteBuffer& buffer() {
@@ -387,29 +401,39 @@ public:
 
         Solace::ByteBuffer& build();
 
+        /**
+         * Set response message tag
+         * @param value Tag of the response message.
+         * @return Ref to this for a fluent interface.
+         */
+        ResponseBuilder& tag(Tag value) {
+            _tag = value;
+            return (*this);
+        }
+
         ResponseBuilder& version(const Solace::String& version, size_type maxMessageSize = MAX_MESSAGE_SIZE);
-        ResponseBuilder& auth(Tag tag, const Qid& qid);
-        ResponseBuilder& error(Tag tag, const Solace::String& message);
-        ResponseBuilder& flush(Tag tag);
-        ResponseBuilder& attach(Tag tag, const Qid& qid);
-        ResponseBuilder& walk(Tag tag, const Solace::Array<Qid>& qids);
-        ResponseBuilder& open(Tag tag, const Qid& qid, size_type iounit);
-        ResponseBuilder& create(Tag tag, const Qid& qid, size_type iounit);
-        ResponseBuilder& read(Tag tag, const Solace::ImmutableMemoryView& data);
-        ResponseBuilder& write(Tag tag, size_type iounit);
-        ResponseBuilder& clunk(Tag tag);
-        ResponseBuilder& remove(Tag tag);
-        ResponseBuilder& stat(Tag tag, const Stat& value);
-        ResponseBuilder& wstat(Tag tag);
+        ResponseBuilder& auth(const Qid& qid);
+        ResponseBuilder& error(const Solace::String& message);
+        ResponseBuilder& flush();
+        ResponseBuilder& attach(const Qid& qid);
+        ResponseBuilder& walk(const Solace::Array<Qid>& qids);
+        ResponseBuilder& open(const Qid& qid, size_type iounit);
+        ResponseBuilder& create(const Qid& qid, size_type iounit);
+        ResponseBuilder& read(const Solace::ImmutableMemoryView& data);
+        ResponseBuilder& write(size_type iounit);
+        ResponseBuilder& clunk();
+        ResponseBuilder& remove();
+        ResponseBuilder& stat(const Stat& value);
+        ResponseBuilder& wstat();
 
         /* 9P2000.e extention */
-        ResponseBuilder& session(Tag tag);
-        ResponseBuilder& shortRead(Tag tag, const Solace::ImmutableMemoryView& data);
-        ResponseBuilder& shortWrite(Tag tag, size_type iounit);
+        ResponseBuilder& session();
+        ResponseBuilder& shortRead(const Solace::ImmutableMemoryView& data);
+        ResponseBuilder& shortWrite(size_type iounit);
 
     private:
-        Solace::ByteBuffer&             _buffer;
-        Solace::ByteBuffer::size_type   _sizeMark;
+        Tag                     _tag;
+        Solace::ByteBuffer&     _buffer;
     };
 
 
@@ -463,49 +487,13 @@ public:
     Solace::Result<Request, Solace::Error>
     parseRequest(const MessageHeader& header, Solace::ByteBuffer& data) const;
 
-
-protected:
-
-    Solace::Result<Response, Solace::Error>
-    parseNoDataResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseErrorResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseVersionResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseAuthResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseAttachResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseOpenResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseCreateResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseReadResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseWriteResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseStatResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
-    Solace::Result<Response, Solace::Error>
-    parseWalkResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
-
 private:
 
-    size_type   _maxMassageSize;
-    size_type   _maxNegotiatedMessageSize;
+    size_type       _maxMassageSize;
+    size_type       _maxNegotiatedMessageSize;
 
-    Solace::String _initialVersion;
-    Solace::String _negotiatedVersion;
+    Solace::String  _initialVersion;
+    Solace::String  _negotiatedVersion;
 };
 
 }  // end of namespace cadence

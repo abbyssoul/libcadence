@@ -50,6 +50,14 @@ public:
         _io_service.stop();
     }
 
+    void onForkChild() {
+        _io_service.notify_fork(asio::io_service::fork_event::fork_child);
+    }
+
+    void onForkParent() {
+        _io_service.notify_fork(asio::io_service::fork_event::fork_parent);
+    }
+
     asio::io_service* getIOService() {
         return &_io_service;
     }

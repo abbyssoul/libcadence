@@ -29,7 +29,7 @@ AsyncClient::TransactionPool::lookup(TransactionId tag) {
                         [tag](const auto& tx) { return tx.tag == tag; });
 
     if (i == _transactions.end())
-        Solace::raiseInvalidStateError();
+        Solace::raiseInvalidStateError("Transaction lookup failed - no transaction by given id");
 
     return *i;
 }
@@ -73,7 +73,7 @@ AsyncClient::sendRequest(Transaction& tx) {
                                 return _resourceProtocol->parseMessageHeader(tx.buffer.flip());
                             });
                 })
-                .onError([&tx, this](Solace::Error&& e) -> Result<P9Protocol::MessageHeader, Solace::Error> {
+                .onError([&tx, this](Error&& e) -> Result<P9Protocol::MessageHeader, Error> {
                     _transactionPool.releaseTransaction(tx.tag);
 
                     return Err(std::move(e));
@@ -89,8 +89,7 @@ AsyncClient::sendRequest(Transaction& tx) {
 
                                 return _resourceProtocol->parseResponse(msgHeader, msg2Tx.buffer.flip());
                             })
-                            .onError([txId = header.tag, this](Solace::Error&& e)
-                                     -> Result<P9Protocol::Response, Solace::Error> {
+                            .onError([txId = header.tag, this](Error&& e) -> Result<P9Protocol::Response, Error> {
                                 _transactionPool.releaseTransaction(txId);
 
                                 return Err(std::move(e));
@@ -119,22 +118,25 @@ AsyncClient::releaseFid(P9Protocol::Fid fid) {
 }
 
 
-AsyncClient::AsyncClient(async::StreamSocket* socket, Solace::MemoryManager& mem) :
+AsyncClient::AsyncClient(async::StreamSocket* socket, MemoryManager& mem, uint32 concurrencyHint) :
+    _memoryManage(&mem),
     _socket(socket),
     _resourceProtocol(std::make_unique<P9Protocol>()),
     _authFid(P9Protocol::NOFID),
     _rootFid(P9Protocol::NOFID),
-    _transactionPool(2, mem),
-  _fidMap(10)
+    _transactionPool(concurrencyHint, mem),
+    _fidMap(10)
 {
 }
 
 AsyncClient::AsyncClient(AsyncClient&& rhs) noexcept :
+    _memoryManage(std::move(rhs._memoryManage)),
     _socket(std::move(rhs._socket)),
     _resourceProtocol(std::move(rhs._resourceProtocol)),
     _authFid(std::move(rhs._authFid)),
     _rootFid(std::move(rhs._rootFid)),
-    _transactionPool(std::move(rhs._transactionPool))
+    _transactionPool(std::move(rhs._transactionPool)),
+    _fidMap(std::move(rhs._fidMap))
 {}
 
 
@@ -180,7 +182,10 @@ AsyncClient::auth(const String& resource, const String& cred) {
 
                 return doAuthDance(response.auth.qid, cred, resource);
             })
-            .onError([](Error&&) -> Result<void, Error> {
+            .onError([this](Error&&) -> Result<void, Error> {
+                releaseFid(_authFid);
+                _authFid = P9Protocol::NOFID;
+
                 return Ok();  // It's fine - not a real error. Just no authentication required!
             })
             .then([cred, resource, this]() {
@@ -193,7 +198,6 @@ Future<void>
 AsyncClient::doAuthDance(const P9Protocol::Qid& authQid, const String& userName, const String& rootName) {
     auto& tx = _transactionPool.allocateTransaction();
 
-    _authFid = allocateFid();
     String token = userName;  // FIXME: Do a better auth
     P9Protocol::RequestBuilder(tx.buffer)
             .tag(tx.tag)
@@ -201,7 +205,7 @@ AsyncClient::doAuthDance(const P9Protocol::Qid& authQid, const String& userName,
 
     // Write it into the pipe
     return sendRequest(tx)
-            .then([this, &tx](P9Protocol::Response&& /*response*/) -> Result<void, Solace::Error> {
+            .then([this, &tx](P9Protocol::Response&& /*response*/) -> Result<void, Error> {
                 _transactionPool.releaseTransaction(tx.tag);
 
                 // Probably should examine root Qid too.
@@ -222,11 +226,85 @@ AsyncClient::doAttachment(const String& userName, const String& rootName) {
 
     // Write it into the pipe
     return sendRequest(tx)
-            .then([&tx, this](P9Protocol::Response&& /*response*/) -> Result<void, Solace::Error> {
+            .then([&tx, this](P9Protocol::Response&& /*response*/) -> Result<void, Error> {
                 _transactionPool.releaseTransaction(tx.tag);
                 // Probably should examine root Qid too.
 
                 return Ok();
+            });
+}
+
+Future<P9Protocol::size_type>
+AsyncClient::open(P9Protocol::Fid fid, P9Protocol::OpenMode mode) {
+    auto& tx = _transactionPool.allocateTransaction();
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .open(fid, mode);
+
+    return sendRequest(tx)
+            .then([this](P9Protocol::Response&& r) {
+                _transactionPool.releaseTransaction(r.tag);
+
+                return r.open.iounit;
+            });
+}
+
+Future<MemoryView>
+AsyncClient::read(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type iounit) {
+    auto& tx = _transactionPool.allocateTransaction();
+
+    if (iounit == 0) {  // Maximum number of butes that can be read in one frame
+                        // is the size of the message frame less the message header and data size.
+        iounit = _resourceProtocol->maxNegotiatedMessageSize() -
+                (_resourceProtocol->headerSize() + sizeof(P9Protocol::size_type));
+    }
+
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .read(fid, offset, iounit);
+
+    return sendRequest(tx)
+            .then([this] (P9Protocol::Response&& response) {
+                auto& data = response.read.data;
+                MemoryView buffer(_memoryManage->create(data.size()));
+                buffer.write(data);
+
+                _transactionPool.releaseTransaction(response.tag);
+
+                return buffer;
+            });
+}
+
+
+Future<P9Protocol::size_type>
+AsyncClient::write(P9Protocol::Fid fid, const Solace::ImmutableMemoryView& data) {
+    auto& tx = _transactionPool.allocateTransaction();
+
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .write(fid, 0, data);
+
+    return sendRequest(tx)
+            .then([this] (P9Protocol::Response&& response) {
+                _transactionPool.releaseTransaction(response.tag);
+
+                return response.write.count;
+            });
+}
+
+Future<void>
+AsyncClient::clunk(P9Protocol::Fid fid) {
+    auto& tx = _transactionPool.allocateTransaction();
+
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .clunk(fid);
+
+    releaseFid(fid);
+
+    return sendRequest(tx)
+            .then([this](P9Protocol::Response&& resp) {
+                _transactionPool.releaseTransaction(resp.tag);
             });
 }
 
@@ -243,42 +321,94 @@ AsyncClient::read(const Path& path) {
 
     // Write it into the pipe
     return sendRequest(tx)
-            .then([fid, &tx, this] (P9Protocol::Response&& ) {
-                _transactionPool.releaseTransaction(tx.tag);
+            .then([fid, this] (P9Protocol::Response&& r) {
+                _transactionPool.releaseTransaction(r.tag);
 
-                auto& tx2 = _transactionPool.allocateTransaction();
-                P9Protocol::RequestBuilder(tx.buffer)
-                        .tag(tx2.tag)
-                        .open(fid, 1);
-
-                return sendRequest(tx2)
-                        .then([&tx2, this](P9Protocol::Response&& ) {
-                            _transactionPool.releaseTransaction(tx2.tag);
-                        });
-            }).then([fid, this] () {
-                auto& readTx = _transactionPool.allocateTransaction();
-
-                P9Protocol::RequestBuilder(readTx.buffer)
-                        .tag(readTx.tag)
-                        .read(fid, 0, _resourceProtocol->maxNegotiatedMessageSize());
-
-                return sendRequest(readTx);
-            }).then([this] (P9Protocol::Response&& response) {
-                return response.read.data.viewShallow();
+                return open(fid, P9Protocol::OpenMode::READ);
+            }).then([fid, this] (P9Protocol::size_type iounit) {
+                return read(fid, 0, iounit);
             })
             .then([this, fid] (MemoryView&& data) -> Result<MemoryView, Error> {
-                auto& clunkTx = _transactionPool.allocateTransaction();
-
-                P9Protocol::RequestBuilder(clunkTx.buffer)
-                        .tag(clunkTx.tag)
-                        .clunk(fid);
-
-                releaseFid(fid);
-
-                sendRequest(clunkTx).then([&clunkTx, this](P9Protocol::Response&&) {
-                    _transactionPool.releaseTransaction(clunkTx.tag);
-                });
+                clunk(fid);
 
                 return Ok(std::move(data));
+            });
+}
+
+
+Future<void>
+AsyncClient::write(const Path& path, const Solace::ImmutableMemoryView& data) {
+    // Prepare the version request
+    auto& tx = _transactionPool.allocateTransaction();
+
+    const auto fid = allocateFid();
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .walk(_rootFid, fid, path);
+
+    // Write it into the pipe
+    return sendRequest(tx)
+            .then([fid, this] (P9Protocol::Response&& r) {
+                _transactionPool.releaseTransaction(r.tag);
+
+                return open(fid, P9Protocol::OpenMode::WRITE);
+            }).then([fid, &data, this] (P9Protocol::size_type ) {
+                return write(fid, data);
+            })
+            .then([this, fid] (P9Protocol::size_type ) {
+                clunk(fid);
+            });
+}
+
+
+Future<Array<Path>>
+AsyncClient::readDir(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type iounit, std::vector<Path>&& lst) {
+    return read(fid, offset, iounit)
+            .then([this, fid, iounit, offset, l=std::move(lst)](MemoryView&& data) mutable {
+                const auto dataSize = data.size();
+                if (dataSize > 0) {
+                    ByteBuffer b(std::move(data));
+                    P9Protocol::P9Decoder decoder(b);
+                    while (b.hasRemaining()) {
+                        P9Protocol::Stat stat;
+                        decoder.read(&stat);
+
+                        l.emplace_back(stat.name);
+                    }
+
+                    const auto newOffset = offset + dataSize;
+                    return readDir(fid, newOffset, iounit, std::move(l));
+                } else {
+                    return makeFuture(Array<Path>(std::move(l)));
+                }
+            });
+}
+
+
+Future<Array<Path>>
+AsyncClient::list(const Path& path) { 
+    // Prepare the version request
+    auto& tx = _transactionPool.allocateTransaction();
+
+    const auto fid = allocateFid();
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .walk(_rootFid, fid, path);
+
+    // Write it into the pipe
+    return sendRequest(tx)
+            .then([fid, this] (P9Protocol::Response&& r) {
+                _transactionPool.releaseTransaction(r.tag);
+
+                return open(fid, P9Protocol::OpenMode::READ);
+            }).then([fid, this] (P9Protocol::size_type iounit) {
+                std::vector<Path> lst;
+
+                return readDir(fid, 0, iounit, std::move(lst));
+            })
+            .then([this, fid] (Array<Path>&& list) -> Result<Array<Path>, Error> {
+                clunk(fid);
+
+                return Ok(std::move(list));
             });
 }

@@ -28,105 +28,105 @@ const P9Protocol::Fid  P9Protocol::NOFID = static_cast<P9Protocol::Fid>(~0);
 // static const char* UNKNOWN_PROTOCOL_VERSION = "unknown";
 
 
-class P9Decoder {
-public:
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(uint8* dest) {
+    _src.readLE(*dest);
+    return *this;
+}
 
-    P9Decoder(ByteBuffer& src) :
-        _src(src)
-    {}
 
-    P9Decoder& read(uint8* dest) {
-        _src.readLE(*dest);
-        return *this;
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(uint16* dest) {
+    _src.readLE(*dest);
+    return *this;
+}
+
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(uint32* dest) {
+    _src.readLE(*dest);
+    return *this;
+}
+
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(uint64* dest) {
+    _src.readLE(*dest);
+    return *this;
+}
+
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(String* dest) {
+    uint16 dataSize = 0;
+    _src.readLE(dataSize);
+
+    std::string buff;
+    buff.reserve(dataSize);
+
+    for (decltype(dataSize) i = 0; i < dataSize; ++i) {
+        char c;
+        _src >> c;
+
+        buff.append(1, c);
     }
 
-    P9Decoder& read(uint16* dest) {
-        _src.readLE(*dest);
-        return *this;
+    *dest = buff;
+
+    return *this;
+}
+
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(P9Protocol::Qid* qid) {
+    return read(&qid->type)
+            .read(&qid->version)
+            .read(&qid->path);
+}
+
+
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(P9Protocol::Stat* stat) {
+    return read(&stat->size)
+            .read(&stat->type)
+            .read(&stat->dev)
+            .read(&(stat->qid))
+            .read(&stat->mode)
+            .read(&stat->atime)
+            .read(&stat->mtime)
+            .read(&stat->length)
+            .read(&(stat->name))
+            .read(&(stat->uid))
+            .read(&(stat->gid))
+            .read(&(stat->muid));
+}
+
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(ImmutableMemoryView* data) {
+
+    P9Protocol::size_type dataSize = 0;
+    read(&dataSize);
+    *data = _src.viewRemaining().slice(0, dataSize);
+    _src.advance(dataSize);
+
+    return (*this);
+}
+
+P9Protocol::P9Decoder&
+P9Protocol::P9Decoder::read(Path* path) {
+    uint16 componentsCount = 0;
+    read(&componentsCount);
+
+    // FIXME: This is where PathBuilder will be handy.
+    Path newPath;
+    for (uint16 i = 0; i < componentsCount; ++i) {
+        String component;
+        read(&component);
+
+        // FIXME: Performance kick in the nuts!
+        newPath = Path::join(newPath, component);
     }
 
-    P9Decoder& read(uint32* dest) {
-        _src.readLE(*dest);
-        return *this;
-    }
+    *path = std::move(newPath);
+    return (*this);
+}
 
-    P9Decoder& read(uint64* dest) {
-        _src.readLE(*dest);
-        return *this;
-    }
-
-    P9Decoder& read(String* dest) {
-        uint16 dataSize = 0;
-        _src.readLE(dataSize);
-
-        std::string buff;
-        buff.reserve(dataSize);
-
-        for (decltype(dataSize) i = 0; i < dataSize; ++i) {
-            char c;
-            _src >> c;
-
-            buff.append(1, c);
-        }
-
-        *dest = buff;
-
-        return *this;
-    }
-
-    P9Decoder& read(P9Protocol::Qid* qid) {
-        return read(&qid->type)
-                .read(&qid->version)
-                .read(&qid->path);
-    }
-
-
-    P9Decoder& read(P9Protocol::Stat* stat) {
-        return read(&stat->size)
-                .read(&stat->type)
-                .read(&stat->dev)
-                .read(&(stat->qid))
-                .read(&stat->mode)
-                .read(&stat->atime)
-                .read(&stat->mtime)
-                .read(&stat->length)
-                .read(&(stat->name))
-                .read(&(stat->uid))
-                .read(&(stat->gid))
-                .read(&(stat->muid));
-    }
-
-    P9Decoder& read(ImmutableMemoryView* data) {
-
-        P9Protocol::size_type dataSize = 0;
-        read(&dataSize);
-        *data = _src.viewRemaining().slice(0, dataSize);
-        _src.advance(dataSize);
-
-        return (*this);
-    }
-
-    P9Decoder& read(Path* path) {
-        uint16 componentsCount = 0;
-        read(&componentsCount);
-
-        // FIXME: This is where PathBuilder will be handy.
-        Path newPath;
-        for (uint16 i = 0; i < componentsCount; ++i) {
-            String component;
-            read(&component);
-
-            // FIXME: Performance kick in the nuts!
-            newPath = Path::join(newPath, component);
-        }
-
-        *path = std::move(newPath);
-        return (*this);
-    }
-
-private:
-    ByteBuffer& _src;
-};
 
 
 
@@ -142,7 +142,7 @@ Result<P9Protocol::Response, Error>
 parseErrorResponse(const P9Protocol::MessageHeader& SOLACE_UNUSED(header), ByteBuffer& data) {
     String errorMessage;
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&errorMessage);
 
     return Err(Error(errorMessage.c_str()));
@@ -153,7 +153,7 @@ Result<P9Protocol::Response, Error>
 parseVersionResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.version.msize)
             .read(&fcall.version.version);
 
@@ -165,7 +165,7 @@ Result<P9Protocol::Response, Error>
 parseAuthResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.auth.qid);
 
     return Ok(std::move(fcall));
@@ -176,7 +176,7 @@ Result<P9Protocol::Response, Error>
 parseAttachResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.attach.qid);
 
     return Ok(std::move(fcall));
@@ -188,7 +188,7 @@ Result<P9Protocol::Response, Error>
 parseOpenResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.open.qid)
             .read(&fcall.open.iounit);
 
@@ -200,7 +200,7 @@ Result<P9Protocol::Response, Error>
 parseCreateResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.create.qid)
             .read(&fcall.open.iounit);
 
@@ -212,7 +212,7 @@ Result<P9Protocol::Response, Error>
 parseReadResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.read.data);
 
     return Ok(std::move(fcall));
@@ -223,7 +223,7 @@ Result<P9Protocol::Response, Error>
 parseWriteResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.write.count);
 
     return Ok(std::move(fcall));
@@ -234,7 +234,7 @@ Result<P9Protocol::Response, Error>
 parseStatResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder(data)
+    P9Protocol::P9Decoder(data)
             .read(&fcall.stat);
 
     return Ok(std::move(fcall));
@@ -245,7 +245,7 @@ Result<P9Protocol::Response, Error>
 parseWalkResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Decoder decoder(data);
+    P9Protocol::P9Decoder decoder(data);
 
     // FIXME: Non-sense!
     decoder.read(&fcall.walk.nqids);
@@ -266,9 +266,10 @@ Result<P9Protocol::Request, Error>
 parseVersionRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.version.msize)
-            .read(&fcall.version.version);
+    auto& msg = fcall.asVersion();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.msize)
+            .read(&msg.version);
 
     return Ok(std::move(fcall));
 }
@@ -278,10 +279,11 @@ Result<P9Protocol::Request, Error>
 parseAuthRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.auth.afid)
-            .read(&fcall.auth.uname)
-            .read(&fcall.auth.aname);
+    auto& msg = fcall.asAuth();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.afid)
+            .read(&msg.uname)
+            .read(&msg.aname);
 
     return Ok(std::move(fcall));
 }
@@ -291,8 +293,9 @@ Result<P9Protocol::Request, Error>
 parseFlushRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.flush.oldtag);
+    auto& msg = fcall.asFlush();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.oldtag);
 
     return Ok(std::move(fcall));
 }
@@ -302,11 +305,12 @@ Result<P9Protocol::Request, Error>
 parseAttachRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.attach.fid)
-            .read(&fcall.attach.afid)
-            .read(&fcall.attach.uname)
-            .read(&fcall.attach.aname);
+    auto& msg = fcall.asAttach();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.afid)
+            .read(&msg.uname)
+            .read(&msg.aname);
 
     return Ok(std::move(fcall));
 }
@@ -316,9 +320,10 @@ Result<P9Protocol::Request, Error>
 parseWalkRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.walk.fid)
-            .read(&fcall.walk.path);
+    auto& msg = fcall.asWalk();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.path);
 
     return Ok(std::move(fcall));
 }
@@ -329,9 +334,13 @@ Result<P9Protocol::Request, Error>
 parseOpenRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.open.fid)
-            .read(&fcall.open.mode);
+    auto& msg = fcall.asOpen();
+    byte openMode;
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&openMode);
+
+    msg.mode = static_cast<P9Protocol::OpenMode>(openMode);
 
     return Ok(std::move(fcall));
 }
@@ -341,11 +350,15 @@ Result<P9Protocol::Request, Error>
 parseCreateRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.create.fid)
-            .read(&fcall.create.name)
-            .read(&fcall.create.perm)
-            .read(&fcall.create.mode);
+    auto& msg = fcall.asCreate();
+    byte openMode;
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.name)
+            .read(&msg.perm)
+            .read(&openMode);
+
+    msg.mode = static_cast<P9Protocol::OpenMode>(openMode);
 
     return Ok(std::move(fcall));
 }
@@ -355,10 +368,11 @@ Result<P9Protocol::Request, Error>
 parseReadRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.read.fid)
-            .read(&fcall.read.offset)
-            .read(&fcall.read.count);
+    auto& msg = fcall.asRead();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.offset)
+            .read(&msg.count);
 
     return Ok(std::move(fcall));
 }
@@ -368,10 +382,11 @@ Result<P9Protocol::Request, Error>
 parseWriteRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.write.fid)
-            .read(&fcall.write.offset)
-            .read(&fcall.write.data);
+    auto& msg = fcall.asWrite();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.offset)
+            .read(&msg.data);
 
     return Ok(std::move(fcall));
 }
@@ -381,8 +396,9 @@ Result<P9Protocol::Request, Error>
 parseClunkRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.clunk.fid);
+    auto& msg = fcall.asClunk();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid);
 
     return Ok(std::move(fcall));
 }
@@ -392,8 +408,9 @@ Result<P9Protocol::Request, Error>
 parseRemoveRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.remove.fid);
+    auto& msg = fcall.asRemove();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid);
 
     return Ok(std::move(fcall));
 }
@@ -403,8 +420,9 @@ Result<P9Protocol::Request, Error>
 parseStatRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.stat.fid);
+    auto& msg = fcall.asStat();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid);
 
     return Ok(std::move(fcall));
 }
@@ -414,9 +432,10 @@ Result<P9Protocol::Request, Error>
 parseWStatRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.wstat.fid)
-            .read(&fcall.wstat.stat);
+    auto& msg = fcall.asWstat();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.stat);
 
     return Ok(std::move(fcall));
 }
@@ -427,10 +446,11 @@ Result<P9Protocol::Request, Error>
 parseSessionRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-//    P9Decoder(data);
+    auto& msg = fcall.asSession();
+//    P9Protocol::P9Decoder(data);
 //            .read(&fcall.session.key);
 
-    fcall.session.key = data.viewRemaining().slice(0, 8);
+    msg.key = data.viewRemaining().slice(0, 8);
     data.advance(8);
 
     return Ok(std::move(fcall));
@@ -440,9 +460,10 @@ Result<P9Protocol::Request, Error>
 parseShortReadRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.shortRead.fid)
-            .read(&fcall.shortRead.path);
+    auto& msg = fcall.asShortRead();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.path);
 
     return Ok(std::move(fcall));
 }
@@ -451,10 +472,11 @@ Result<P9Protocol::Request, Error>
 parseShortWriteRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
-    P9Decoder(data)
-            .read(&fcall.shortWrite.fid)
-            .read(&fcall.shortWrite.path)
-            .read(&fcall.shortWrite.data);
+    auto& msg = fcall.asShortWrite();
+    P9Protocol::P9Decoder(data)
+            .read(&msg.fid)
+            .read(&msg.path)
+            .read(&msg.data);
 
     return Ok(std::move(fcall));
 }
@@ -602,10 +624,10 @@ P9Protocol::P9Protocol(size_type maxMassageSize, const Solace::String& version) 
 
 
 P9Protocol::Request::Request(MessageType msgType, Tag msgTag) :
-    type(msgType),
-    tag(msgTag)
+    _tag(msgTag),
+    _type(msgType)
 {
-    switch (type) {
+    switch (_type) {
     case MessageType::TVersion: new (&version)  Version;        return;
     case MessageType::TAuth:    new (&auth)     Auth;           return;
     case MessageType::TFlush:   new (&flush)    Flush;          return;
@@ -632,10 +654,10 @@ P9Protocol::Request::Request(MessageType msgType, Tag msgTag) :
 }
 
 P9Protocol::Request::Request(Request&& rhs) :
-    type(std::move(rhs.type)),
-    tag(std::move(rhs.tag))
+    _tag(std::move(rhs._tag)),
+    _type(std::move(rhs._type))
 {
-    switch (type) {
+    switch (_type) {
     case MessageType::TVersion: new (&version)  Version(std::move(rhs.version));    return;
     case MessageType::TAuth:    new (&auth)     Auth(std::move(rhs.auth));       return;
     case MessageType::TFlush:   new (&flush)    Flush(std::move(rhs.flush));      return;
@@ -662,7 +684,7 @@ P9Protocol::Request::Request(Request&& rhs) :
 }
 
 P9Protocol::Request::~Request() {
-    switch (type) {
+    switch (_type) {
     case MessageType::TVersion: (&version)->~Version();     break;
     case MessageType::TAuth:    (&auth)->~Auth();           break;
     case MessageType::TFlush:   (&flush)->~Flush();         break;
@@ -687,6 +709,137 @@ P9Protocol::Request::~Request() {
         break;
     }
 }
+
+
+P9Protocol::Request::Version&
+P9Protocol::Request::asVersion() {
+    if (_type != MessageType::TVersion)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return version;
+}
+
+P9Protocol::Request::Auth&
+P9Protocol::Request::asAuth(){
+    if (_type != MessageType::TAuth)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return auth;
+}
+
+P9Protocol::Request::Flush&
+P9Protocol::Request::asFlush(){
+    if (_type != MessageType::TFlush)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return flush;
+}
+
+P9Protocol::Request::Attach&
+P9Protocol::Request::asAttach(){
+    if (_type != MessageType::TAttach)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return attach;
+}
+
+P9Protocol::Request::Walk&
+P9Protocol::Request::asWalk(){
+    if (_type != MessageType::TWalk)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return walk;
+}
+
+P9Protocol::Request::Open&
+P9Protocol::Request::asOpen(){
+    if (_type != MessageType::TOpen)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return open;
+}
+
+P9Protocol::Request::Create&
+P9Protocol::Request::asCreate(){
+    if (_type != MessageType::TCreate)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return create;
+}
+
+P9Protocol::Request::Read&
+P9Protocol::Request::asRead(){
+    if (_type != MessageType::TRead)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return read;
+}
+
+P9Protocol::Request::Write&
+P9Protocol::Request::asWrite(){
+    if (_type != MessageType::TWrite)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return write;
+}
+
+P9Protocol::Request::Clunk&
+P9Protocol::Request::asClunk(){
+    if (_type != MessageType::TClunk)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return clunk;
+}
+
+P9Protocol::Request::Remove&
+P9Protocol::Request::asRemove(){
+    if (_type != MessageType::TRemove)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return remove;
+}
+
+P9Protocol::Request::StatRequest&
+P9Protocol::Request::asStat(){
+    if (_type != MessageType::TStat)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return stat;
+}
+
+P9Protocol::Request::WStat&
+P9Protocol::Request::asWstat(){
+    if (_type != MessageType::TWStat)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return wstat;
+}
+
+P9Protocol::Request::Session&
+P9Protocol::Request::asSession(){
+    if (_type != MessageType::TSession)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return session;
+}
+
+P9Protocol::Request::SRead&
+P9Protocol::Request::asShortRead(){
+    if (_type != MessageType::TSRead)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return shortRead;
+}
+
+P9Protocol::Request::SWrite&
+P9Protocol::Request::asShortWrite(){
+    if (_type != MessageType::TSWrite)
+        Solace::raise<IOException>("Incorrect message type");
+
+    return shortWrite;
+}
+
+
 
 
 P9Protocol::Response::Response(MessageType msgType, Tag msgTag) :

@@ -304,8 +304,8 @@ TEST_F(P9Messages, createVersionRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(proc.maxPossibleMessageSize(), request.version.msize);
-    ASSERT_STREQ(testVersion.c_str(), request.version.version.c_str());
+    ASSERT_EQ(proc.maxPossibleMessageSize(), request.asVersion().msize);
+    ASSERT_STREQ(testVersion.c_str(), request.asVersion().version.c_str());
 }
 
 TEST_F(P9Messages, createVersionRespose) {
@@ -372,9 +372,9 @@ TEST_F(P9Messages, createAuthRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(312, request.auth.afid);
-    ASSERT_STREQ("User mcUsers", request.auth.uname.c_str());
-    ASSERT_STREQ("Somewhere near", request.auth.aname.c_str());
+    ASSERT_EQ(312, request.asAuth().afid);
+    ASSERT_STREQ("User mcUsers", request.asAuth().uname.c_str());
+    ASSERT_STREQ("Somewhere near", request.asAuth().aname.c_str());
 }
 
 
@@ -503,7 +503,7 @@ TEST_F(P9Messages, createFlushRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(7711, request.flush.oldtag);
+    ASSERT_EQ(7711, request.asFlush().oldtag);
 }
 
 
@@ -562,10 +562,10 @@ TEST_F(P9Messages, createAttachRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(3310, request.attach.fid);
-    ASSERT_EQ(1841, request.attach.afid);
-    ASSERT_STREQ("McFace", request.attach.uname.c_str());
-    ASSERT_STREQ("close to u", request.attach.aname.c_str());
+    ASSERT_EQ(3310, request.asAttach().fid);
+    ASSERT_EQ(1841, request.asAttach().afid);
+    ASSERT_STREQ("McFace", request.asAttach().uname.c_str());
+    ASSERT_STREQ("close to u", request.asAttach().aname.c_str());
 }
 
 TEST_F(P9Messages, createAttachRespose) {
@@ -626,7 +626,7 @@ TEST_F(P9Messages, createOpenRequest) {
     P9Protocol proc;
 
     P9Protocol::RequestBuilder(_buffer)
-            .open(517, 11);
+            .open(517, P9Protocol::OpenMode::RDWR);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -638,8 +638,8 @@ TEST_F(P9Messages, createOpenRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(517, request.open.fid);
-    ASSERT_EQ(11, request.open.mode);
+    ASSERT_EQ(517, request.asOpen().fid);
+    ASSERT_EQ(P9Protocol::OpenMode::RDWR, request.asOpen().mode);
 }
 
 
@@ -707,7 +707,7 @@ TEST_F(P9Messages, createCreateRequest) {
     P9Protocol proc;
 
     P9Protocol::RequestBuilder(_buffer)
-            .create(1734, "mcFance", 11, 077);
+            .create(1734, "mcFance", 11, P9Protocol::OpenMode::EXEC);
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
     ASSERT_TRUE(headerResult.isOk());
 
@@ -719,10 +719,10 @@ TEST_F(P9Messages, createCreateRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(1734, request.create.fid);
-    ASSERT_STREQ("mcFance", request.create.name.c_str());
-    ASSERT_EQ(11, request.create.perm);
-    ASSERT_EQ(077, request.create.mode);
+    ASSERT_EQ(1734, request.asCreate().fid);
+    ASSERT_STREQ("mcFance", request.asCreate().name.c_str());
+    ASSERT_EQ(11, request.asCreate().perm);
+    ASSERT_EQ(P9Protocol::OpenMode::EXEC, request.asCreate().mode);
 }
 
 TEST_F(P9Messages, createCreateRespose) {
@@ -800,9 +800,9 @@ TEST_F(P9Messages, createReadRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(7234, request.read.fid);
-    ASSERT_EQ(18, request.read.offset);
-    ASSERT_EQ(772, request.read.count);
+    ASSERT_EQ(7234, request.asRead().fid);
+    ASSERT_EQ(18, request.asRead().offset);
+    ASSERT_EQ(772, request.asRead().count);
 }
 
 TEST_F(P9Messages, createReadRespose) {
@@ -878,9 +878,9 @@ TEST_F(P9Messages, createWriteRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(15927, request.write.fid);
-    ASSERT_EQ(98, request.write.offset);
-    ASSERT_EQ(data, request.write.data);
+    ASSERT_EQ(15927, request.asWrite().fid);
+    ASSERT_EQ(98, request.asWrite().offset);
+    ASSERT_EQ(data, request.asWrite().data);
 }
 
 TEST_F(P9Messages, createWriteRespose) {
@@ -948,7 +948,7 @@ TEST_F(P9Messages, createClunkRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(37509, request.clunk.fid);
+    ASSERT_EQ(37509, request.asClunk().fid);
 }
 
 TEST_F(P9Messages, createClunkRespose) {
@@ -1005,7 +1005,7 @@ TEST_F(P9Messages, createRemoveRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(54329, request.remove.fid);
+    ASSERT_EQ(54329, request.asRemove().fid);
 }
 
 TEST_F(P9Messages, createRemoveRespose) {
@@ -1062,7 +1062,7 @@ TEST_F(P9Messages, createStatRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(7872, request.stat.fid);
+    ASSERT_EQ(7872, request.asStat().fid);
 }
 
 TEST_F(P9Messages, createStatRespose) {
@@ -1176,8 +1176,8 @@ TEST_F(P9Messages, createWStatRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(8193, request.wstat.fid);
-    ASSERT_EQ(stat, request.wstat.stat);
+    ASSERT_EQ(8193, request.asWstat().fid);
+    ASSERT_EQ(stat, request.asWstat().stat);
 }
 
 TEST_F(P9Messages, createWStatRespose) {
@@ -1242,7 +1242,7 @@ TEST_F(P9Messages, createSessionRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(data, request.session.key);
+    ASSERT_EQ(data, request.asSession().key);
 }
 
 TEST_F(P9Messages, createSessionRespose) {
@@ -1305,8 +1305,8 @@ TEST_F(P9Messages, createShortReadRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(32, request.shortRead.fid);
-    ASSERT_EQ(path, request.shortRead.path);
+    ASSERT_EQ(32, request.asShortRead().fid);
+    ASSERT_EQ(path, request.asShortRead().path);
 }
 
 
@@ -1388,9 +1388,9 @@ TEST_F(P9Messages, createShortWriteRequest) {
     ASSERT_TRUE(message.isOk());
 
     auto request = message.moveResult();
-    ASSERT_EQ(32, request.shortWrite.fid);
-    ASSERT_EQ(path, request.shortWrite.path);
-    ASSERT_EQ(data, request.shortWrite.data);
+    ASSERT_EQ(32, request.asShortWrite().fid);
+    ASSERT_EQ(path, request.asShortWrite().path);
+    ASSERT_EQ(data, request.asShortWrite().data);
 }
 
 

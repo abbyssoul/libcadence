@@ -28,15 +28,20 @@ int main(int argc, const char **argv) {
 
     P9Protocol::size_type bufferSize = P9Protocol::MAX_MESSAGE_SIZE;
     uint32 serverPort = 5640;
-    String serverEndpoint;
+    String userName;
+    String rootName;
+    String serverEndpoint("127.0.0.1");
+    String dir("data");
 
     auto res = CommandlineParser("libcadence/async_client", {
                             CommandlineParser::printHelp(),
                             CommandlineParser::printVersion("async_clent", cadence::getBuildVersion()),
                             {'p', "port", "Server port", &serverPort},
-                            {'m', "msgSize", "Maximum message size", &bufferSize}
-                      },
-                      {{"endpoint", "Resource server endpoint", &serverEndpoint}})
+                            {'u', "user", "User name to Authenticate as", &userName},
+                            {'r', "root", "Resource root to attach to", &rootName},
+                            {'m', "msgSize", "Maximum message size", &bufferSize},
+                            {'h', "host", "Resource server endpoint", &serverEndpoint}},
+                        {{"dir", "Directory to explore", &dir}})
             .parse(argc, argv);
 
     if (!res) {
@@ -56,7 +61,7 @@ int main(int argc, const char **argv) {
     IPEndpoint ipEndpoint(serverEndpoint, serverPort);
 
 
-    MemoryManager memManager(2 * bufferSize);
+    MemoryManager memManager(3 * bufferSize);
     EventLoop iocontext;
     TcpSocket socket(iocontext);
     AsyncClient client(&socket, memManager);
@@ -74,10 +79,20 @@ int main(int argc, const char **argv) {
                             std::cerr << "Authentication rejected: " << err.toString() << std::endl;
                         });
             })
+            .then([&client, &dir]() {
+                return client.list(Path::parse(dir))// ({"data", "items", "0", "tags"}))
+                        .then([](Solace::Array<Solace::Path>&& list) {
+                            std::cout << "ls> " << std::endl;
+                            for (auto& path : list) {
+                                std::cout << path.toString() << std::endl;
+                            }
+                            std::cout << std::endl;
+                        });
+            })
             .then([&client]() {
                 return client.read(Path({"data", "updated"}))
                         .then([](Solace::MemoryView&& data) {
-                            std::cout << "Read> \'";
+                            std::cout << "read> \'";
                             std::cout.write(data.dataAs<const char>(), data.size());
                             std::cout << "\'" << std::endl;
                         });

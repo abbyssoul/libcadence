@@ -302,36 +302,36 @@ P9Protocol::RequestBuilder::remove(Fid fid) {
 
 
 P9Protocol::RequestBuilder&
-P9Protocol::RequestBuilder::open(Fid fid, byte mode) {
+P9Protocol::RequestBuilder::open(Fid fid, P9Protocol::OpenMode mode) {
     // Compute message size first:
     const size_type payloadSize =
             protocolSize(fid) +                // Fid of the file to open
-            protocolSize(mode);                // Mode of the file to open
+            protocolSize(static_cast<byte>(mode));                // Mode of the file to open
 
     P9Encoder(buffer())
             .header(MessageType::TOpen, _tag, payloadSize)
             .encode(fid)
-            .encode(mode);
+            .encode(static_cast<byte>(mode));
 
     return (*this);
 }
 
 
 P9Protocol::RequestBuilder&
-P9Protocol::RequestBuilder::create(Fid fid, const String& name, uint32 permissions, byte mode) {
+P9Protocol::RequestBuilder::create(Fid fid, const String& name, uint32 permissions, P9Protocol::OpenMode mode) {
     // Compute message size first:
     const size_type payloadSize =
             protocolSize(fid) +
             protocolSize(name) +
             protocolSize(permissions) +
-            protocolSize(mode);
+            protocolSize(static_cast<byte>(mode));
 
     P9Encoder(buffer())
             .header(MessageType::TCreate, _tag, payloadSize)
             .encode(fid)
             .encode(name)
             .encode(permissions)
-            .encode(mode);
+            .encode(static_cast<byte>(mode));
 
     return (*this);
 }

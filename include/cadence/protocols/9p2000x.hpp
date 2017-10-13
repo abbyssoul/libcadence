@@ -54,7 +54,22 @@ public:
         MAX_WELEM = 16
     };
 
-    /* 9P message types */
+    /**
+     *  Flags for the mode field in Topen and Tcreate messages
+     */
+    enum class OpenMode : Solace::byte {
+        READ   = 0,  // open read-only
+        WRITE  = 1,  // open write-only
+        RDWR   = 2,  // open read-write
+        EXEC   = 3,  // execute (== read but check execute permission)
+        TRUNC  = 16, // or'ed in (except for exec), truncate file first
+        CEXEC  = 32, // or'ed in, close on exec
+        RCLOSE = 64, // or'ed in, remove on close
+    };
+
+    /**
+     * 9P message types
+     */
     enum class MessageType : Solace::byte {
         _beginSupportedMessageCode = 100,
         TVersion = 100,
@@ -127,6 +142,29 @@ public:
         Solace::String  muid;
     };
 
+
+
+    class P9Decoder {
+    public:
+
+        P9Decoder(Solace::ByteBuffer& src) :
+            _src(src)
+        {}
+
+        P9Decoder& read(Solace::uint8* dest);
+        P9Decoder& read(Solace::uint16* dest);
+        P9Decoder& read(Solace::uint32* dest);
+        P9Decoder& read(Solace::uint64* dest);
+        P9Decoder& read(Solace::String* dest);
+        P9Decoder& read(Qid* qid);
+        P9Decoder& read(Stat* stat);
+        P9Decoder& read(Solace::ImmutableMemoryView* data);
+        P9Decoder& read(Solace::Path* path);
+
+    private:
+        Solace::ByteBuffer& _src;
+    };
+
     /**
      * Common header that all messages have.
      */
@@ -138,8 +176,6 @@ public:
 
 
     struct Request {
-        MessageType type;
-        Tag         tag;
 
         struct Version {
             size_type       msize;
@@ -157,32 +193,32 @@ public:
         };
 
         struct Attach {
-            Fid        fid;
-            Fid        afid;
+            Fid             fid;
+            Fid             afid;
             Solace::String  uname;
             Solace::String  aname;
         };
 
         struct Walk {
-            Fid        fid;
-            Fid        newfid;
+            Fid             fid;
+            Fid             newfid;
             Solace::Path    path;
         };
 
         struct Open {
-            Fid        fid;
-            Solace::uint8   mode;
+            Fid         fid;
+            OpenMode    mode;
         };
 
         struct Create {
-            Fid        fid;
+            Fid             fid;
             Solace::String  name;
             Solace::uint32  perm;
-            Solace::uint8   mode;
+            OpenMode        mode;
         };
 
         struct Read {
-            Fid        fid;
+            Fid             fid;
             Solace::uint64  offset;
             Solace::uint32  count;
         };
@@ -227,6 +263,37 @@ public:
         };
 
 
+
+        Request(MessageType rtype, Tag tag);
+        Request(Request&& rhs);
+
+        ~Request();
+
+        Tag tag() const { return _tag; }
+
+        MessageType type() const { return _type; }
+
+        Version&        asVersion();
+        Auth&           asAuth();
+        Flush&          asFlush();
+        Attach&         asAttach();
+        Walk&           asWalk();
+        Open&           asOpen();
+        Create&         asCreate();
+        Read&           asRead();
+        Write&          asWrite();
+        Clunk&          asClunk();
+        Remove&         asRemove();
+        StatRequest&    asStat();
+        WStat&          asWstat();
+        Session&        asSession();
+        SRead&          asShortRead();
+        SWrite&         asShortWrite();
+
+    private:
+
+        Tag             _tag;
+        MessageType     _type;
         union {
             Version     version;
             Auth        auth;
@@ -247,11 +314,6 @@ public:
             SRead       shortRead;
             SWrite      shortWrite;
         };
-
-        Request(MessageType rtype, Tag tag);
-        Request(Request&& rhs);
-
-        ~Request();
     };
 
 
@@ -261,9 +323,9 @@ public:
     class RequestBuilder {
     public:
 
-        RequestBuilder(Solace::ByteBuffer& buffer) :
+        RequestBuilder(Solace::ByteBuffer& dest) :
             _tag(1),
-            _buffer(buffer)
+            _buffer(dest)
         {}
 
         Solace::ByteBuffer& buffer() {
@@ -282,7 +344,7 @@ public:
             return (*this);
         }
 
-//        Tag tag() const { return _tag; }
+        Tag tag() const { return _tag; }
 
         /**
          * Create a version request.
@@ -297,11 +359,11 @@ public:
         RequestBuilder& attach(Fid fid, Fid afid,
                                 const Solace::String& userName, const Solace::String& attachName);
         RequestBuilder& walk(Fid fid, Fid nfid, const Solace::Path& path);
-        RequestBuilder& open(Fid fid, Solace::byte mode);
+        RequestBuilder& open(Fid fid, OpenMode mode);
         RequestBuilder& create(Fid fid,
                                 const Solace::String& name,
                                 Solace::uint32 permissions,
-                                Solace::byte mode);
+                                OpenMode mode);
         RequestBuilder& read(Fid fid, Solace::uint64 offset, size_type count);
         RequestBuilder& write(Fid fid, Solace::uint64 offset, const Solace::ImmutableMemoryView& data);
         RequestBuilder& clunk(Fid fid);
@@ -390,9 +452,9 @@ public:
     class ResponseBuilder {
     public:
 
-        ResponseBuilder(Solace::ByteBuffer& buffer) :
+        ResponseBuilder(Solace::ByteBuffer& dest) :
             _tag(1),
-            _buffer(buffer)
+            _buffer(dest)
         {}
 
         Solace::ByteBuffer& buffer() {
@@ -410,6 +472,8 @@ public:
             _tag = value;
             return (*this);
         }
+
+        Tag tag() const { return _tag; }
 
         ResponseBuilder& version(const Solace::String& version, size_type maxMessageSize = MAX_MESSAGE_SIZE);
         ResponseBuilder& auth(const Qid& qid);

@@ -70,8 +70,9 @@ else # Release optimizations
 endif
 
 
+# NOTE: -DASIO_STANDALONE doesn't work as there is no asio::deadline_timer without it
 CPPFLAGS += -I$(PUBLIC_HEADERS) -D_FORTIFY_SOURCE=2
-CPPFLAGS += -Iexternal/asio/asio/include \
+CPPFLAGS += -isystem external/asio/asio/include \
 			-I../libsolace/include \
 			-isystem ${GTEST_DIR}/include
 

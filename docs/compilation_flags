@@ -1,0 +1,6 @@
+#Some compiler flags to try:
+
+## Clang X-Ray:
+clang -fxray-instrument -std=c++17 ...
+XRAY_OPTIONS="patch_premain=true" ./build/bin/async_client
+llvm-xray-4.0 convert -output-format=yaml -symboliz -instr_map=./build/bin/async_client exray-log.a.out.QwRpnz

@@ -33,7 +33,7 @@ public:
 
 public:
 
-    AsyncClient(async::StreamSocket* socket, Solace::MemoryManager& mem);
+    AsyncClient(async::StreamSocket* socket, Solace::MemoryManager& mem, Solace::uint32 concurrencyHint = 2);
 
     AsyncClient(AsyncClient&& rhs) noexcept;
 
@@ -127,6 +127,20 @@ protected:
     Solace::Future<void>
     doAttachment(const Solace::String& userName, const Solace::String& rootName);
 
+    Solace::Future<P9Protocol::size_type>
+    open(P9Protocol::Fid fid, P9Protocol::OpenMode mode);
+
+    Solace::Future<Solace::MemoryView>
+    read(P9Protocol::Fid fid, Solace::uint64 offset, P9Protocol::size_type iounit = 0);
+
+    Solace::Future<P9Protocol::size_type>
+    write(P9Protocol::Fid fid, const Solace::ImmutableMemoryView& data);
+
+    Solace::Future<void>
+    clunk(P9Protocol::Fid fid);
+
+    Solace::Future<Solace::Array<Solace::Path>>
+    readDir(P9Protocol::Fid fid, Solace::uint64 offset, P9Protocol::size_type iounit, std::vector<Solace::Path>&& list);
 
 private:
 
@@ -142,14 +156,15 @@ private:
         std::vector<Transaction>  _transactions;
     };
 
+    Solace::MemoryManager*              _memoryManage;
     async::StreamSocket*                _socket;                //!< Communication socket
 
-    std::unique_ptr<P9Protocol>   _resourceProtocol;  //!< Communication protocol to create messages and parse responses
-    P9Protocol::Fid          _authFid;           //!< Authentication token
-    P9Protocol::Fid          _rootFid;           //!< Root of the tree we are attached to
+    std::unique_ptr<P9Protocol> _resourceProtocol;  //!< Communication protocol to create messages and parse responses
+    P9Protocol::Fid             _authFid;           //!< Authentication token
+    P9Protocol::Fid             _rootFid;           //!< Root of the tree we are attached to
 
-    TransactionPool _transactionPool;
-    std::vector<bool>   _fidMap;
+    TransactionPool             _transactionPool;
+    std::vector<bool>           _fidMap;
 };
 
 }  // End of namespace cadence

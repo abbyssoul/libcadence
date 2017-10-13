@@ -56,7 +56,7 @@ test_obj = $(addprefix $(BUILD_DIR)/, $(test_src:.cpp=.o))
 dep = $(obj:.o=.d)  # one dependency file for each source
 
 
-CXXFLAGS += -std=c++14 -pipe -fstack-protector -ftemplate-depth=128
+CXXFLAGS += -std=c++14 -pipe -ftemplate-depth=128
 CXXFLAGS += -pedantic -Wall -Wextra -Wabi -Wfloat-equal \
 -Wshadow -Wno-missing-field-initializers -Wno-missing-braces \
 -Wcast-qual -Wno-sign-compare -Wno-multichar
@@ -65,8 +65,10 @@ CXXFLAGS += -pedantic -Wall -Wextra -Wabi -Wfloat-equal \
 # FIXME: Can't use -D_GLIBCXX_DEBUG until libsolace use it, subject to move from CppUnit to GTest
 ifdef dbg
 	CXXFLAGS += -O0 -ggdb3 -DDEBUG -D _DEBUG
+	CXXFLAGS += -fstack-protector-all -fsanitize=address,undefined,leak -fno-omit-frame-pointer
 else # Release optimizations
 	CXXFLAGS += -Ofast -flto
+	CXXFLAGS += -fstack-protector
 endif
 
 
@@ -82,6 +84,9 @@ LDFLAGS +=  -L$(TARGET_DIR) \
 			-L../libsolace/build/src
 
 LDLIBS += -l$(PROJECT) -lsolace -pthread
+ifdef dbg
+	LDLIBS += -lasan -llsan -lubsan
+endif
 
 test_LDLIBS = -l$(GTEST_LIB)
 

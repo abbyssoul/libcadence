@@ -156,6 +156,22 @@ public:
         _acceptor.accept(socket->getSocket());
     }
 
+    void open(const IPEndpoint& endpoint, int32 backlog, bool reuseAddr = true) {
+        auto e = toAsioTCPEndpoint(endpoint);
+
+        if (!_acceptor.is_open())
+            _acceptor.open(e.protocol());
+
+
+        if (reuseAddr) {
+          _acceptor.set_option(asio::socket_base::reuse_address(true));
+        }
+
+        _acceptor.bind(e);
+        _acceptor.listen(backlog);
+
+    }
+
     bool nonBlocking() {
         return _acceptor.non_blocking();
     }
@@ -231,6 +247,11 @@ void TcpAcceptor::nativeNonBlocking(bool mode) {
     _pimpl->nativeNonBlocking(mode);
 }
 
+
+void TcpAcceptor::open(const IPEndpoint& endpoint, int32 backlog, bool reuseAddr) {
+    _pimpl->open(endpoint, backlog, reuseAddr);
+}
+
 void TcpAcceptor::cancel() {
     _pimpl->cancel();
 }
@@ -244,7 +265,7 @@ bool TcpAcceptor::isOpen() {
 }
 
 bool TcpAcceptor::isClosed() {
-    return !_pimpl->isClosed();
+    return _pimpl->isClosed();
 }
 
 Future<void>

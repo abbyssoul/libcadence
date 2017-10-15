@@ -3,8 +3,10 @@
 bin/
 build/
 doc/html
+lib/
 libs/*/
 tools/*/
+src/generated/
 coverage.info
 Makefile
 

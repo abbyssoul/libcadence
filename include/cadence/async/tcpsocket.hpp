@@ -135,13 +135,21 @@ public:
 
     ~TcpAcceptor();
 
+    /**
+     * Construct an acceptor without opening it.
+     * @param ioContext ioContext
+     */
+    TcpAcceptor(EventLoop& ioContext);
+
+    /**
+     * Construct an acceptor opened on the given endpoint.
+     * @param ioContext Event loop object.
+     * @param port Port to open acceptor at.
+     */
     TcpAcceptor(EventLoop& ioContext, Solace::uint16 port);
 
     TcpAcceptor(const TcpAcceptor& rhs) = delete;
-
     TcpAcceptor& operator= (const TcpAcceptor& rhs) = delete;
-
-    TcpAcceptor(EventLoop& ioContext);
 
     TcpAcceptor(TcpAcceptor&& rhs);
 
@@ -153,22 +161,12 @@ public:
 
     bool isOpen();
     bool isClosed();
-    void listen(int backlog = 9999);
+
+    void open(const IPEndpoint& endpoint, Solace::int32 backlog, bool reuseAddr = true);
 
     void accept(TcpSocket& socket);
 
     Solace::Future<void> asyncAccept(TcpSocket& socket);
-
-
-//    template <typename SettableSocketOption>
-//    void setOption(const SettableSocketOption& option) {
-//        _acceptor.set_option(option);
-//    }
-
-//    template <typename GettableSocketOption>
-//    void getOption(GettableSocketOption& option) {
-//        _acceptor.get_option(option);
-//    }
 
     bool nonBlocking();
     bool nativeNonBlocking();

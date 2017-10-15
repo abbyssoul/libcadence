@@ -25,6 +25,9 @@ public:
         _socket(*static_cast<asio::io_service*>(ioservice))
     {}
 
+    StreamDomainSocketImpl(StreamDomainSocketImpl&& other) :
+        _socket(std::move(other._socket))
+    {}
 
     void connect(const String& server) {
         _socket.connect(asio::local::stream_protocol::endpoint(server.c_str()));
@@ -107,7 +110,7 @@ StreamDomainSocket::StreamDomainSocket(EventLoop& ioContext) :
 
 StreamDomainSocket::StreamDomainSocket(StreamDomainSocket&& rhs) :
     StreamSocket(std::move(rhs)),
-    _pimpl(std::move(rhs._pimpl))
+    _pimpl(std::make_unique<StreamDomainSocketImpl>(std::move(*rhs._pimpl.get())))
 {
 }
 

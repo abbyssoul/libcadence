@@ -27,6 +27,10 @@ public:
         _socket(*static_cast<asio::io_service*>(ioservice))
     {}
 
+    TcpSocketImpl(TcpSocketImpl&& other) :
+        _socket(std::move(other._socket))
+    {}
+
     Future<void>
     asyncRead(ByteBuffer& dest, std::size_t bytesToRead) {
         Promise<void> promise;
@@ -220,7 +224,7 @@ TcpAcceptor::TcpAcceptor(EventLoop& ioContext) :
 }
 
 TcpAcceptor::TcpAcceptor(TcpAcceptor&& rhs) :
-    _pimpl(std::move(rhs._pimpl))
+  _pimpl(std::move(rhs._pimpl))
 {
 }
 
@@ -288,7 +292,7 @@ TcpSocket::TcpSocket(EventLoop& ioContext) :
 
 TcpSocket::TcpSocket(TcpSocket&& rhs) :
     StreamSocket(std::move(rhs)),
-    _pimpl(std::move(rhs._pimpl))
+    _pimpl(std::make_unique<TcpSocketImpl>(std::move(*rhs._pimpl.get())))
 {
 }
 

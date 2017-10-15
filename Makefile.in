@@ -80,7 +80,6 @@ CPPFLAGS += -isystem external/asio/asio/include \
 
 # LD flags and LIBS only make sense for tests and example when building a library project
 LDFLAGS +=  -L$(TARGET_DIR) \
-			-L$(BUILD_DIR)/lib \
 			-L../libsolace/build/src
 
 LDLIBS += -l$(PROJECT) -lsolace -pthread
@@ -89,7 +88,7 @@ ifdef dbg
 endif
 
 test_CPPFLAGS += -isystem ${GTEST_DIR}/include
-test_LDLIBS += -l$(GTEST_LIB)
+test_LDLIBS += -L$(BUILD_DIR)/lib -l$(GTEST_LIB)
 
 
 # Export compiler options and extra libs for examples and tests

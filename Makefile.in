@@ -13,8 +13,9 @@ ifeq (g++, $(findstring g++,$(CXX)))
 endif
 
 # Project directory layout
-TARGET_DIR = libs
-export TARGET = $(TARGET_DIR)/lib$(PROJECT).a
+TARGET_DIR = lib
+TARGET_NAME = lib$(PROJECT).a
+export TARGET = $(TARGET_DIR)/$(TARGET_NAME)
 
 export PUBLIC_HEADERS = include
 export BUILD_DIR = build
@@ -75,8 +76,7 @@ endif
 # NOTE: -DASIO_STANDALONE doesn't work as there is no asio::deadline_timer without it
 CPPFLAGS += -I$(PUBLIC_HEADERS) -D_FORTIFY_SOURCE=2
 CPPFLAGS += -isystem external/asio/asio/include \
-			-I../libsolace/include \
-			-isystem ${GTEST_DIR}/include
+			-I../libsolace/include
 
 # LD flags and LIBS only make sense for tests and example when building a library project
 LDFLAGS +=  -L$(TARGET_DIR) \
@@ -88,7 +88,9 @@ ifdef dbg
 	LDLIBS += -lasan -llsan -lubsan
 endif
 
-test_LDLIBS = -l$(GTEST_LIB)
+test_CPPFLAGS += -isystem ${GTEST_DIR}/include
+test_LDLIBS += -l$(GTEST_LIB)
+
 
 # Export compiler options and extra libs for examples and tests
 export CXXFLAGS
@@ -141,7 +143,8 @@ $(TARGET): $(obj)
 #-------------------------------------------------------------------------------
 .PHONY: examples
 examples: $(TARGET)
-	@$(MAKE) -C $(EXAMPLES_SRC_DIR) -f Makefile.in
+	if test -d $(EXAMPLES_SRC_DIR); then $(MAKE) -C $(EXAMPLES_SRC_DIR) -f Makefile.in; fi
+
 
 
 #-------------------------------------------------------------------------------
@@ -149,7 +152,7 @@ examples: $(TARGET)
 #-------------------------------------------------------------------------------
 $(BUILD_DIR)/gtest-all.o: ${GTEST_DIR}/src/gtest-all.cc
 	@mkdir -p $(dir $@)
-	$(CXX) -isystem ${GTEST_DIR}/include -I${GTEST_DIR} -pthread $(CXXFLAGS) $(CPPFLAGS) -c -o $@ ${GTEST_DIR}/src/gtest-all.cc
+	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $(test_CPPFLAGS) -I${GTEST_DIR} -pthread -o $@ ${GTEST_DIR}/src/gtest-all.cc
 
 $(GTEST_TARGET): $(BUILD_DIR)/gtest-all.o
 	@mkdir -p $(dir $@)
@@ -158,15 +161,20 @@ $(GTEST_TARGET): $(BUILD_DIR)/gtest-all.o
 $(TEST_TARGET_DIR):
 	@mkdir -p $@
 
+$(BUILD_DIR)/$(TEST_SRC_DIR)/%.o: $(TEST_SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $(test_CPPFLAGS) -o $@ $<
+
 $(TEST_TAGRET): $(TARGET) $(TEST_TARGET_DIR) $(GTEST_TARGET)
 
 
 $(TEST_TAGRET): $(test_obj)
 	$(CXX) -o $@ $(CXXFLAGS) $(test_obj) $(LDFLAGS) $(LDLIBS) $(test_LDLIBS)
 
-.PHONY: test
 test: $(TEST_TAGRET)
 	./$(TEST_TAGRET)
+
+.PHONY: test
 
 
 #-------------------------------------------------------------------------------
@@ -191,19 +199,36 @@ $(DOC_TARGET):
 doc: $(MODULE_HEADERS) $(MODULE_SRC) $(DOC_TARGET)
 
 
-
 #-------------------------------------------------------------------------------
 # Install
 #-------------------------------------------------------------------------------
 
 .PHONY: install
 install: $(TARGET)
-	@install -v -D -t $(DESTDIR)$(PREFIX)/bin $(TARGET)
+	@install -m 644 -v -D -t $(DESTDIR)$(PREFIX)/$(TARGET_DIR) $(TARGET)
+	@for i in $(shell find $(PUBLIC_HEADERS)/$(PROJECT) -type d); do \
+		install -m 755 -v -d $(DESTDIR)$(PREFIX)/$$i; \
+		install -m 644 -v -D -t $(DESTDIR)$(PREFIX)/$$i $$i/*.hpp; \
+	done
 
 
 .PHONY: uninstall
 uninstall:
-	$(RM) -f $(DESTDIR)$(PREFIX)/bin/$(PROJECT)
+	$(RM) -f $(DESTDIR)$(PREFIX)/$(TARGET_DIR)/$(TARGET_NAME)
+	$(RM) -rf $(DESTDIR)$(PREFIX)/include/$(PROJECT)
+
+
+#-------------------------------------------------------------------------------
+# Packaging
+#-------------------------------------------------------------------------------
+
+.PHONY: debian
+debian:
+	dpkg-buildpackage -d
+
+.PHONY: debian-clean
+debian-clean:
+	dpkg-buildpackage -d -T clean
 
 
 #-------------------------------------------------------------------------------
@@ -276,6 +301,8 @@ verify: valgrind-memcheck
 
 
 $(COVERAGE_REPORT): $(BUILD_DIR)/build_coverage
+	cd ${BUILD_DIR} && ./${TEST_DIR}/$(TESTNAME)
+
 	# capture coverage info
 	lcov --directory . --capture --output-file $@
 	# filter out system and test code

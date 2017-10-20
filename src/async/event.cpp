@@ -15,7 +15,8 @@
 
 #include <sys/eventfd.h>
 
-#include "asio.hpp"
+#include "asio_helper.hpp"
+
 
 
 using namespace Solace;
@@ -42,7 +43,7 @@ public:
         _eventFd.async_read_some(asio::buffer(&_readBuffer, sizeof(_readBuffer)),
             [pm = std::move(promise)] (const asio::error_code& error, std::size_t) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 pm.setValue();
             }

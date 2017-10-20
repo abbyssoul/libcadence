@@ -40,7 +40,7 @@ public:
         _socket.async_receive(asio_buffer(dest, bytesToRead),
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -60,7 +60,7 @@ public:
         _socket.async_receive_from(asio_buffer(dest, bytesToRead), senderEndpoint,
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -79,7 +79,7 @@ public:
         _socket.async_send(asio_buffer(src, bytesToWrite),
             [pm = std::move(promise), &src](const asio::error_code& error, std::size_t bytesTransferred) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 src.advance(bytesTransferred);
                 pm.setValue();
@@ -97,7 +97,7 @@ public:
         _socket.async_send_to(asio_buffer(src, bytesToWrite), toAsioEndpoint(addr),
             [pm = std::move(promise), &src](asio::error_code error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 src.advance(length);
                 pm.setValue();

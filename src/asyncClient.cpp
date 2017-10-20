@@ -60,43 +60,6 @@ AsyncClient::TransactionPool::releaseTransaction(TransactionId tag) {
 
 
 
-Future<P9Protocol::Response>
-AsyncClient::sendRequest(Transaction& tx) {
-    return _socket->asyncWrite(tx.buffer.flip())
-                .then([&tx, this] () {
-                    // When that's done - expect a response of a header size:
-                    tx.buffer.clear();
-
-                    // FIXME: Support out of order responses!
-                    return _socket->asyncRead(tx.buffer, _resourceProtocol->headerSize())
-                            .then([&tx, this]() {
-                                return _resourceProtocol->parseMessageHeader(tx.buffer.flip());
-                            });
-                })
-                .onError([&tx, this](Error&& e) -> Result<P9Protocol::MessageHeader, Error> {
-                    _transactionPool.releaseTransaction(tx.tag);
-
-                    return Err(std::move(e));
-                })
-                .then([this] (P9Protocol::MessageHeader&& header) {
-                    auto& msgTx = _transactionPool.lookup(header.tag);
-
-                    // From the header size let's deduce what is expected message size and read it
-                    const auto payloadSize = header.size - _resourceProtocol->headerSize();
-                    return _socket->asyncRead(msgTx.buffer.clear(), payloadSize)
-                            .then([msgHeader = std::move(header), this]() {
-                                auto& msg2Tx = _transactionPool.lookup(msgHeader.tag);
-
-                                return _resourceProtocol->parseResponse(msgHeader, msg2Tx.buffer.flip());
-                            })
-                            .onError([txId = header.tag, this](Error&& e) -> Result<P9Protocol::Response, Error> {
-                                _transactionPool.releaseTransaction(txId);
-
-                                return Err(std::move(e));
-                            });
-                });
-}
-
 
 P9Protocol::Fid
 AsyncClient::allocateFid() {
@@ -118,10 +81,10 @@ AsyncClient::releaseFid(P9Protocol::Fid fid) {
 }
 
 
-AsyncClient::AsyncClient(async::StreamSocket* socket, MemoryManager& mem, uint32 concurrencyHint) :
+AsyncClient::AsyncClient(std::unique_ptr<async::Channel> socket, MemoryManager& mem, uint32 concurrencyHint) :
     _memoryManage(&mem),
-    _socket(socket),
-    _resourceProtocol(std::make_unique<P9Protocol>()),
+    _socket(std::move(socket)),
+    _resourceProtocol(),
     _authFid(P9Protocol::NOFID),
     _rootFid(P9Protocol::NOFID),
     _transactionPool(concurrencyHint, mem),
@@ -139,10 +102,10 @@ AsyncClient::AsyncClient(AsyncClient&& rhs) noexcept :
     _fidMap(std::move(rhs._fidMap))
 {}
 
-
+/*
 Future<void>
 AsyncClient::connect(const NetworkEndpoint& endpoint) {
-    return _socket->asyncConnect(endpoint).then([this]() {
+    return _socket->connect(endpoint).then([this]() {
         // Prepare the version request
         auto& tx = _transactionPool.allocateTransaction();
 
@@ -154,19 +117,45 @@ AsyncClient::connect(const NetworkEndpoint& endpoint) {
                 .then([this, &tx](P9Protocol::Response&& response) {
                     _transactionPool.releaseTransaction(tx.tag);
 
-                    _resourceProtocol->maxNegotiatedMessageSize(response.version.msize);
+                    _resourceProtocol.maxNegotiatedMessageSize(response.version.msize);
                     // TODO(abbyssoul): Check if version is supported:
-                    _resourceProtocol->setNegotiatedVersion(response.version.version);
+                    _resourceProtocol.setNegotiatedVersion(response.version.version);
 
                     // Now we should have the whole message
                     return;  // response.version.version;
                 });
     });
 }
+*/
+
+Future<void>
+AsyncClient::beginSession(const String& resource, const String& cred) {
+    // Prepare the version request
+    auto& tx = _transactionPool.allocateTransaction();
+
+    P9Protocol::RequestBuilder(tx.buffer)
+            .version();
+
+    // Write it into the pipe
+    return sendRequest(tx)
+            .then([this, &tx](P9Protocol::Response&& response) {
+                _transactionPool.releaseTransaction(tx.tag);
+
+                _resourceProtocol.maxNegotiatedMessageSize(response.version.msize);
+                // TODO(abbyssoul): Check if version is supported:
+                _resourceProtocol.setNegotiatedVersion(response.version.version);
+
+                // Now we should have the whole message
+                return;  // response.version.version;
+            })
+            .then([this, resource, cred]() {
+                return doAuth(resource, cred);
+            });
+}
 
 
 Future<void>
-AsyncClient::auth(const String& resource, const String& cred) {
+AsyncClient::doAuth(const String& resource, const String& cred) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
 
@@ -186,7 +175,7 @@ AsyncClient::auth(const String& resource, const String& cred) {
                 releaseFid(_authFid);
                 _authFid = P9Protocol::NOFID;
 
-                return Ok();  // It's fine - not a real error. Just no authentication required!
+                return Ok();  // It's fine - probably not a real error. Just no authentication required!
             })
             .then([cred, resource, this]() {
                 return doAttachment(cred, resource);
@@ -255,8 +244,8 @@ AsyncClient::read(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type ioun
 
     if (iounit == 0) {  // Maximum number of butes that can be read in one frame
                         // is the size of the message frame less the message header and data size.
-        iounit = _resourceProtocol->maxNegotiatedMessageSize() -
-                (_resourceProtocol->headerSize() + sizeof(P9Protocol::size_type));
+        iounit = _resourceProtocol.maxNegotiatedMessageSize() -
+                (_resourceProtocol.headerSize() + sizeof(P9Protocol::size_type));
     }
 
     P9Protocol::RequestBuilder(tx.buffer)
@@ -411,4 +400,42 @@ AsyncClient::list(const Path& path) {
 
                 return Ok(std::move(list));
             });
+}
+
+
+Future<P9Protocol::Response>
+AsyncClient::sendRequest(Transaction& tx) {
+    return _socket->asyncWrite(tx.buffer.flip())
+                .then([&tx, this] () {
+                    // When that's done - expect a response of a header size:
+                    tx.buffer.clear();
+
+                    // FIXME: Support out of order responses!
+                    return _socket->asyncRead(tx.buffer, _resourceProtocol.headerSize())
+                            .then([&tx, this]() {
+                                return _resourceProtocol.parseMessageHeader(tx.buffer.flip());
+                            });
+                })
+                .onError([&tx, this](Error&& e) -> Result<P9Protocol::MessageHeader, Error> {
+                    _transactionPool.releaseTransaction(tx.tag);
+
+                    return Err(std::move(e));
+                })
+                .then([this] (P9Protocol::MessageHeader&& header) {
+                    auto& msgTx = _transactionPool.lookup(header.tag);
+
+                    // From the header size let's deduce what is expected message size and read it
+                    const auto payloadSize = header.size - _resourceProtocol.headerSize();
+                    return _socket->asyncRead(msgTx.buffer.clear(), payloadSize)
+                            .then([msgHeader = std::move(header), this]() {
+                                auto& msg2Tx = _transactionPool.lookup(msgHeader.tag);
+
+                                return _resourceProtocol.parseResponse(msgHeader, msg2Tx.buffer.flip());
+                            })
+                            .onError([txId = header.tag, this](Error&& e) -> Result<P9Protocol::Response, Error> {
+                                _transactionPool.releaseTransaction(txId);
+
+                                return Err(std::move(e));
+                            });
+                });
 }

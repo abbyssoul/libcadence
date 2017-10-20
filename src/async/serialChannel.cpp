@@ -86,7 +86,7 @@ public:
         _serial.async_read_some(asio_buffer(buffer, bytesToRead),
             [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 buffer.advance(length);
                 pm.setValue();
@@ -105,7 +105,7 @@ public:
         _serial.async_read_some(asio_buffer(buffer, bytesToWrite),
             [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 buffer.advance(length);
                 pm.setValue();

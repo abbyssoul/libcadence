@@ -52,7 +52,7 @@ public:
         _in.async_read_some(asio_buffer(dest, bytesToRead),
             [&dest, pm = std::move(promise)](const asio::error_code error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -70,7 +70,7 @@ public:
         _out.async_write_some(asio_buffer(src, bytesToWrite),
             [&src, pm = std::move(promise)](const asio::error_code error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 src.advance(length);
                 pm.setValue();

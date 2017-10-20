@@ -11,7 +11,7 @@
  *******************************************************************************/
 #include <cadence/async/signalSet.hpp>
 
-#include "asio.hpp"
+#include "asio_helper.hpp"
 
 
 using namespace Solace;
@@ -36,7 +36,7 @@ public:
 
         _signals.async_wait([pm = std::move(promise)] (const asio::error_code& error, int signalNumber) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 pm.setValue(signalNumber);
             }

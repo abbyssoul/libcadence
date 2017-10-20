@@ -39,7 +39,7 @@ public:
         asio::async_read(_socket, asio_buffer(dest, bytesToRead),
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -57,7 +57,7 @@ public:
         asio::async_write(_socket, asio_buffer(src, bytesToWrite),
             [pm = std::move(promise), &src](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 src.advance(length);
                 pm.setValue();
@@ -75,7 +75,7 @@ public:
         _socket.async_connect(toAsioTCPEndpoint(endpoint),
         [pm = std::move(promise)] (const asio::error_code& error) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 pm.setValue();
             }
@@ -84,9 +84,17 @@ public:
         return f;
     }
 
-    void connect(const IPEndpoint& endpoint) {
-        _socket.connect(toAsioTCPEndpoint(endpoint));
+    Result<void, Error> connect(const IPEndpoint& endpoint) {
+        asio::error_code ec;
+
+        _socket.connect(toAsioTCPEndpoint(endpoint), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
     }
+
 
     void cancel() {
         _socket.cancel();
@@ -147,7 +155,7 @@ public:
 
         _acceptor.async_accept(socket->getSocket(), [pm = std::move(promise)](const asio::error_code& error) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 pm.setValue();
             }
@@ -328,8 +336,8 @@ void TcpSocket::close() {
     _pimpl->close();
 }
 
-void TcpSocket::connect(const NetworkEndpoint& endpoint) {
-    _pimpl->connect(*static_cast<const IPEndpoint*>(&endpoint));
+Result<void, Error> TcpSocket::connect(const NetworkEndpoint& endpoint) {
+    return _pimpl->connect(*static_cast<const IPEndpoint*>(&endpoint));
 }
 
 

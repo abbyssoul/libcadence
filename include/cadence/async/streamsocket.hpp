@@ -47,7 +47,7 @@ public:
      * This call will block until a connection is complete (either successfully or in an error)
      * @param endpoint An endpoint to connect to.
      */
-    virtual void connect(const NetworkEndpoint& endpoint) = 0;
+    virtual Solace::Result<void, Solace::Error> connect(const NetworkEndpoint& endpoint) = 0;
 
     /**
      * Start an asynchronous connection to the given endpoint.

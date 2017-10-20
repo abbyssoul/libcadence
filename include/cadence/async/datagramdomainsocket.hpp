@@ -18,16 +18,13 @@
 #define CADENCE_ASYNC_DATAGRAMDOMAINSOCKET_HPP
 
 #include "cadence/async/channel.hpp"
-
-#include <solace/string.hpp>
+#include "cadence/unixDomainEndpoint.hpp"
 
 
 namespace cadence { namespace async {
 
-class DatagramDomainSocket : public Channel {
-public:
-    typedef Solace::String endpoint_type;
-
+class DatagramDomainSocket
+        : public Channel {
 public:
 
     ~DatagramDomainSocket();
@@ -37,7 +34,7 @@ public:
 
     DatagramDomainSocket(EventLoop& ioContext);
 
-    DatagramDomainSocket(EventLoop& ioContext, const endpoint_type& serviceName);
+    DatagramDomainSocket(EventLoop& ioContext, const NetworkEndpoint& endpoint);
 
     DatagramDomainSocket(DatagramDomainSocket&& rhs);
 
@@ -51,7 +48,7 @@ public:
     using Channel::asyncWrite;
 
 
-    Solace::Future<void> asyncConnect(const endpoint_type& endpoint);
+    Solace::Future<void> asyncConnect(const NetworkEndpoint& endpoint);
 
     /**
      * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -71,8 +68,8 @@ public:
      * @param dest The provided destination buffer to read data into.
      * @return A future that will be resolved one the buffer has been filled.
      */
-    Solace::Future<void> asyncReadFrom(Solace::ByteBuffer& dest, endpoint_type serviceName) {
-        return asyncReadFrom(dest, dest.remaining(), serviceName);
+    Solace::Future<void> asyncReadFrom(Solace::ByteBuffer& dest, const NetworkEndpoint& endpoint) {
+        return asyncReadFrom(dest, dest.remaining(), endpoint);
     }
 
     /**
@@ -84,7 +81,8 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncReadFrom(Solace::ByteBuffer& dest, std::size_t bytesToRead, endpoint_type serviceName);
+    Solace::Future<void> asyncReadFrom(Solace::ByteBuffer& dest, std::size_t bytesToRead,
+                                       const NetworkEndpoint& endpoint);
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -104,8 +102,8 @@ public:
      * @param src The provided source buffer to read data from.
      * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
      */
-    Solace::Future<void> asyncWriteTo(Solace::ByteBuffer& src, const endpoint_type& serviceName) {
-        return asyncWriteTo(src, src.remaining(), serviceName);
+    Solace::Future<void> asyncWriteTo(Solace::ByteBuffer& src, const NetworkEndpoint& endpoint) {
+        return asyncWriteTo(src, src.remaining(), endpoint);
     }
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -116,7 +114,7 @@ public:
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncWriteTo(Solace::ByteBuffer& src, std::size_t bytesToWrite, endpoint_type serviceName);
+    Solace::Future<void> asyncWriteTo(Solace::ByteBuffer& src, std::size_t bytesToWrite, const NetworkEndpoint& endpoint);
 
     /**
      * Cancel all asynchronous operations associated with the socket.
@@ -132,7 +130,7 @@ public:
      * Connect the socket to the specified endpoint syncroniosly.
      * @param endpoint
      */
-    void connect(const endpoint_type& endpoint);
+    void connect(const NetworkEndpoint& endpoint);
 
     /**
      * Determine whether the socket is open.
@@ -150,13 +148,13 @@ public:
      * Get the local endpoint of the socket.
      * @return Local endpoint this socket is bound to.
      */
-    endpoint_type getLocalEndpoint() const;
+    UnixEndpoint getLocalEndpoint() const;
 
     /**
      * Get the remote endpoint of the socket.
      * @return Remote endpoint this socket is connected to if any.
      */
-    endpoint_type getRemoteEndpoint() const;
+    UnixEndpoint getRemoteEndpoint() const;
 
     /**
      * Disable sends or receives on the socket.

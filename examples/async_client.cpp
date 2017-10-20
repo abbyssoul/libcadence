@@ -24,10 +24,40 @@ using namespace cadence;
 using namespace cadence::async;
 
 
+Future<void> runTestSession(const String& rootName, const String& userName, const String& dir, AsyncClient& client) {
+
+    return client.beginSession(rootName, userName)
+            .then([&client]() {
+                std::cout << "Session established" << std::endl;
+            })
+            .then([&client, &dir]() {
+                return client.list(Path::parse(dir))
+                        .then([](Solace::Array<Solace::Path>&& list) {
+                            std::cout << "ls> " << std::endl;
+                            for (auto& path : list) {
+                                std::cout << path.toString() << std::endl;
+                            }
+                            std::cout << std::endl;
+                        });
+            })
+            .then([&client]() {
+                return client.read(Path({"data", "updated"}))
+                        .then([](Solace::MemoryView&& data) {
+                            std::cout << "read> \'";
+                            std::cout.write(data.dataAs<const char>(), data.size());
+                            std::cout << "\'" << std::endl;
+                        });
+            })
+            .onError([](Solace::Error&& err) {
+                std::cerr << "Error: " << err.toString() << std::endl;
+            });
+}
+
+
 int main(int argc, const char **argv) {
 
     P9Protocol::size_type bufferSize = P9Protocol::MAX_MESSAGE_SIZE;
-    uint32 serverPort = 5640;
+    uint16 serverPort = 5640;
     String userName;
     String rootName;
     String serverEndpoint("127.0.0.1");
@@ -59,47 +89,19 @@ int main(int argc, const char **argv) {
     }
 
     IPEndpoint ipEndpoint(serverEndpoint, serverPort);
-
-
     MemoryManager memManager(3 * bufferSize);
     EventLoop iocontext;
-    TcpSocket socket(iocontext);
-    AsyncClient client(&socket, memManager);
 
-    client.connect(ipEndpoint)
-            .then([]() {
-                std::cout << "Connected" << std::endl;
-            })
-            .then([&client]() {
-                return client.auth("", "")
-                        .then([]() {
-                            std::cout << "Authenticated" << std::endl;
-                        })
-                        .onError([](Solace::Error&& err) {
-                            std::cerr << "Authentication rejected: " << err.toString() << std::endl;
-                        });
-            })
-            .then([&client, &dir]() {
-                return client.list(Path::parse(dir))// ({"data", "items", "0", "tags"}))
-                        .then([](Solace::Array<Solace::Path>&& list) {
-                            std::cout << "ls> " << std::endl;
-                            for (auto& path : list) {
-                                std::cout << path.toString() << std::endl;
-                            }
-                            std::cout << std::endl;
-                        });
-            })
-            .then([&client]() {
-                return client.read(Path({"data", "updated"}))
-                        .then([](Solace::MemoryView&& data) {
-                            std::cout << "read> \'";
-                            std::cout.write(data.dataAs<const char>(), data.size());
-                            std::cout << "\'" << std::endl;
-                        });
-            })
-            .onError([](Solace::Error&& err) {
-                std::cerr << "Error: " << err.toString() << std::endl;
+    auto socket = std::make_unique<TcpSocket>(iocontext);
+    socket->connect(ipEndpoint)
+            .then([&]() {
+                AsyncClient client(std::move(socket), memManager);
+
+                runTestSession(rootName, userName, dir, client);
+            }).orElse([&ipEndpoint](Error&& er) {
+                std::cout << "Failed to connect to '" << ipEndpoint << "': " << er.toString() << std::endl;
             });
+
 
     // Run event loop
     iocontext.run();

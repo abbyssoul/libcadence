@@ -33,8 +33,15 @@ public:
 
 public:
 
-    AsyncClient(async::StreamSocket* socket, Solace::MemoryManager& mem, Solace::uint32 concurrencyHint = 2);
+    /**
+     * Construct async-client with a connect socket and a memory manager.
+     * @param socket Already connect stream-oriented socket.
+     * @param mem Memory manager used for read buffer allocation.
+     * @param concurrencyHint Maximum number of async requests at any given time.
+     */
+    AsyncClient(std::unique_ptr<async::Channel> socket, Solace::MemoryManager& mem, Solace::uint32 concurrencyHint = 2);
 
+    /// Move constructor
     AsyncClient(AsyncClient&& rhs) noexcept;
 
     AsyncClient& operator= (AsyncClient&& rhs) noexcept {
@@ -54,23 +61,27 @@ public:
     }
 
 
-    /**
-     * Connect to the resource server.
-     * @param endpoint Endpoint to connect to the server.
-     * @return Future of connection procedure.
-     */
-    Solace::Future<void>
-    connect(const NetworkEndpoint& endpoint);
 
+//    /**
+//     * Connect to the resource server synchronously.
+//     * @param endpoint Endpoint to connect to the server.
+//     * @return Future of connection outcome.
+//     */
+//    Solace::Future<void> connect(const NetworkEndpoint& endpoint);
+
+//    /**
+//     * Connect to the resource server asynchronously.
+//     * @param endpoint Endpoint to connect to the server.
+//     * @return Future of connection procedure.
+//     */
+//    Solace::Future<void>
+//    asyncConnect(const NetworkEndpoint& endpoint);
 
     /**
-     * Authorise to the specific resource with provided credentials.
-     * @param resource Resource to request authorisation to.
-     * @param cred Creadential to assess resource access authorisation.
-     * @return Future of the authorisation procedure.
+     * Establish a new session with the resource server.
+     * @return Future of an established session, or an error.
      */
-    Solace::Future<void>
-    auth(const Solace::String& resource, const Solace::String& cred);
+    Solace::Future<void> beginSession(const Solace::String& resource, const Solace::String& cred);
 
     /**
      * Read data given resource / key.
@@ -119,6 +130,15 @@ protected:
     Solace::Future<P9Protocol::Response>
     sendRequest(Transaction& tx);
 
+
+    /**
+     * Authorise to the specific resource with provided credentials.
+     * @param resource Resource to request authorisation to.
+     * @param cred Creadential to assess resource access authorisation.
+     * @return Future of the authorisation procedure.
+     */
+    Solace::Future<void> doAuth(const Solace::String& resource, const Solace::String& cred);
+
     Solace::Future<void>
     doAuthDance(const P9Protocol::Qid& authQid,
                 const Solace::String& userName,
@@ -157,9 +177,9 @@ private:
     };
 
     Solace::MemoryManager*              _memoryManage;
-    async::StreamSocket*                _socket;                //!< Communication socket
+    std::unique_ptr<async::Channel>     _socket;                //!< Communication socket
 
-    std::unique_ptr<P9Protocol> _resourceProtocol;  //!< Communication protocol to create messages and parse responses
+    P9Protocol                  _resourceProtocol;  //!< Communication protocol to create messages and parse responses
     P9Protocol::Fid             _authFid;           //!< Authentication token
     P9Protocol::Fid             _rootFid;           //!< Root of the tree we are attached to
 

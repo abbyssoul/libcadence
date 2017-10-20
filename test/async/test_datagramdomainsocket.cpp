@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 using namespace Solace;
+using namespace cadence;
 using namespace cadence::async;
 
 
@@ -41,8 +42,8 @@ protected:
 
 
 TEST_F(TestDatagramDomainSocket, asyncReadWrite) {
-    DatagramDomainSocket::endpoint_type testClientSocketName(testClientSocketNameStr);
-    DatagramDomainSocket::endpoint_type testServerSocketName(testServerSocketNameStr);
+    UnixEndpoint testClientSocketName(testClientSocketNameStr);
+    UnixEndpoint testServerSocketName(testServerSocketNameStr);
 
     DatagramDomainSocket serverSocket(iocontext, testServerSocketName);
     DatagramDomainSocket clientSocket(iocontext, testClientSocketName);

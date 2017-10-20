@@ -33,15 +33,28 @@ public:
         _socket(*static_cast<asio::io_service*>(ioservice))
     {}
 
-    Future<void> asyncConnect(const endpoint_type& peer) {
+
+    Result<void, Error> connect(const NetworkEndpoint& endpoint) {
+        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
+        asio::error_code ec;
+
+        _socket.connect(destination, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
+    }
+
+    Future<void> asyncConnect(const NetworkEndpoint& peer) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        asio::local::datagram_protocol::endpoint endpoint(peer.to_str());
+        asio::local::datagram_protocol::endpoint endpoint(peer.toString().to_str());
         _socket.async_connect(endpoint,
             [pm = std::move(promise)](const asio::error_code& error) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 pm.setValue();
             }
@@ -58,7 +71,7 @@ public:
         _socket.async_receive(asio_buffer(dest, bytesToRead),
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -70,15 +83,15 @@ public:
 
 
     Future<void>
-    asyncReadFrom(ByteBuffer& dest, std::size_t bytesToRead, endpoint_type serviceName) {
+    asyncReadFrom(ByteBuffer& dest, std::size_t bytesToRead, const NetworkEndpoint& endpoint) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        asio::local::datagram_protocol::endpoint destination(serviceName.c_str());
+        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
         _socket.async_receive_from(asio_buffer(dest, bytesToRead), destination,
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -97,7 +110,7 @@ public:
         _socket.async_send(asio_buffer(src, bytesToWrite),
             [pm = std::move(promise), &src](const asio::error_code& error, std::size_t bytesTransferred) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 src.advance(bytesTransferred);
                 pm.setValue();
@@ -109,15 +122,15 @@ public:
 
 
     Future<void>
-    asyncWriteTo(ByteBuffer& src, std::size_t bytesToWrite, endpoint_type serviceName) {
+    asyncWriteTo(ByteBuffer& src, std::size_t bytesToWrite, const NetworkEndpoint& endpoint) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        asio::local::datagram_protocol::endpoint destination(serviceName.c_str());
+        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
         _socket.async_send_to(asio_buffer(src, bytesToWrite), destination,
             [pm = std::move(promise), &src](const asio::error_code& error, std::size_t bytesTransferred) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 src.advance(bytesTransferred);
                 pm.setValue();
@@ -136,22 +149,17 @@ public:
         _socket.close();
     }
 
-    void connect(const endpoint_type& endpoint) {
-        asio::local::datagram_protocol::endpoint destination(endpoint.c_str());
-
-        _socket.connect(destination);
-    }
 
     bool isOpen() {
         return _socket.is_open();
     }
 
-    endpoint_type getLocalEndpoint() const {
-        return _socket.local_endpoint().path();
+    UnixEndpoint getLocalEndpoint() const {
+        return {_socket.local_endpoint().path()};
     }
 
-    endpoint_type getRemoteEndpoint() const {
-        return _socket.remote_endpoint().path();
+    UnixEndpoint getRemoteEndpoint() const {
+        return {_socket.remote_endpoint().path()};
     }
 
     void shutdown() {
@@ -177,9 +185,9 @@ DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext) :
 }
 
 
-DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext, const endpoint_type& point) :
+DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext, const NetworkEndpoint& endpoint) :
     Channel(ioContext),
-    _pimpl(std::make_unique<SocketImpl>(ioContext.getIOService(), point))
+    _pimpl(std::make_unique<SocketImpl>(ioContext.getIOService(), endpoint.toString()))
 {
 }
 
@@ -201,7 +209,7 @@ DatagramDomainSocket& DatagramDomainSocket::swap(DatagramDomainSocket& rhs) noex
 
 
 
-Future<void> DatagramDomainSocket::asyncConnect(const endpoint_type& endpoint) {
+Future<void> DatagramDomainSocket::asyncConnect(const NetworkEndpoint& endpoint) {
     return _pimpl->asyncConnect(endpoint);
 }
 
@@ -211,8 +219,8 @@ DatagramDomainSocket::asyncRead(ByteBuffer& dest, size_type bytesToRead) {
 }
 
 Future<void>
-DatagramDomainSocket::asyncReadFrom(ByteBuffer& dest, std::size_t bytesToRead, endpoint_type serviceName) {
-    return _pimpl->asyncReadFrom(dest, bytesToRead, serviceName);
+DatagramDomainSocket::asyncReadFrom(ByteBuffer& dest, std::size_t bytesToRead, const NetworkEndpoint& endpoint) {
+    return _pimpl->asyncReadFrom(dest, bytesToRead, endpoint);
 }
 
 Future<void>
@@ -221,8 +229,8 @@ DatagramDomainSocket::asyncWrite(ByteBuffer& src, size_type bytesToWrite)  {
 }
 
 Future<void>
-DatagramDomainSocket::asyncWriteTo(ByteBuffer& src, std::size_t bytesToWrite, endpoint_type serviceName) {
-    return _pimpl->asyncWriteTo(src, bytesToWrite, serviceName);
+DatagramDomainSocket::asyncWriteTo(ByteBuffer& src, std::size_t bytesToWrite, const NetworkEndpoint& endpoint) {
+    return _pimpl->asyncWriteTo(src, bytesToWrite, endpoint);
 }
 
 void DatagramDomainSocket::cancel() {
@@ -233,7 +241,7 @@ void DatagramDomainSocket::close() {
     _pimpl->close();
 }
 
-void DatagramDomainSocket::connect(const endpoint_type& endpoint) {
+void DatagramDomainSocket::connect(const NetworkEndpoint& endpoint) {
     _pimpl->connect(endpoint);
 }
 
@@ -245,11 +253,11 @@ bool DatagramDomainSocket::isClosed() {
     return !_pimpl->isOpen();
 }
 
-DatagramDomainSocket::endpoint_type DatagramDomainSocket::getLocalEndpoint() const {
+UnixEndpoint DatagramDomainSocket::getLocalEndpoint() const {
     return _pimpl->getLocalEndpoint();
 }
 
-DatagramDomainSocket::endpoint_type DatagramDomainSocket::getRemoteEndpoint() const {
+UnixEndpoint DatagramDomainSocket::getRemoteEndpoint() const {
     return _pimpl->getRemoteEndpoint();
 }
 

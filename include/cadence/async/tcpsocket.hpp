@@ -87,7 +87,7 @@ public:
      * Connect the socket to the specified endpoint syncroniosly.
      * @param endpoint
      */
-    void connect(const NetworkEndpoint& endpoint) override;
+    Solace::Result<void, Solace::Error> connect(const NetworkEndpoint& endpoint) override;
 
     /**
      * Determine whether the socket is open.

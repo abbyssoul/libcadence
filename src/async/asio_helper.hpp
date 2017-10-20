@@ -13,6 +13,8 @@
 #include "cadence/ipendpoint.hpp"
 #include "asio.hpp"
 
+#include <solace/error.hpp>
+
 namespace cadence {
 
     inline
@@ -36,6 +38,12 @@ namespace cadence {
     IPEndpoint fromAsioEndpoint(const asio::ip::udp::endpoint& addr) {
         return IPEndpoint(addr.address().to_string(), addr.port());
     }
+
+    inline
+    Solace::Error fromAsioError(const asio::error_code& err) {
+        return Solace::Error(err.message(), err.value());
+    }
+
 
     inline
     asio::mutable_buffer asio_buffer(Solace::ByteBuffer& dest, Solace::ByteBuffer::size_type bytes) {

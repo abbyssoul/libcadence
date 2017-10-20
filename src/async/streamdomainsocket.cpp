@@ -29,8 +29,15 @@ public:
         _socket(std::move(other._socket))
     {}
 
-    void connect(const String& server) {
-        _socket.connect(asio::local::stream_protocol::endpoint(server.c_str()));
+    Result<void, Error> connect(const String& server) {
+        asio::error_code ec;
+
+        _socket.connect(asio::local::stream_protocol::endpoint(server.c_str()), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
     }
 
 
@@ -42,7 +49,7 @@ public:
 
         _socket.async_connect(dest, [pm = std::move(promise)] (const asio::error_code& error) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 pm.setValue();
             }
@@ -61,7 +68,7 @@ public:
             [pm = std::move(promise), &dest] (const asio::error_code& error, std::size_t bytes_transferred) mutable {
                 dest.advance(bytes_transferred);
                 if (error) {
-                    pm.setError(Solace::Error(error.message(), error.value()));
+                    pm.setError(fromAsioError(error));
                 } else {
                     pm.setValue();
                 }
@@ -80,7 +87,7 @@ public:
             [pm = std::move(promise), &src] (const asio::error_code& error, std::size_t bytes_transferred) mutable {
                 src.advance(bytes_transferred);
                 if (error) {
-                    pm.setError(Solace::Error(error.message(), error.value()));
+                    pm.setError(fromAsioError(error));
                 } else {
                     pm.setValue();
                 }
@@ -123,8 +130,8 @@ StreamDomainSocket& StreamDomainSocket::swap(StreamDomainSocket& rhs) noexcept {
 }
 
 
-void StreamDomainSocket::connect(const NetworkEndpoint& endpoint) {
-    _pimpl->connect(endpoint.toString());
+Result<void, Error> StreamDomainSocket::connect(const NetworkEndpoint& endpoint) {
+    return _pimpl->connect(endpoint.toString());
 }
 
 
@@ -161,7 +168,7 @@ public:
 
         _acceptor.async_accept(socket->getSocket(), [pm = std::move(promise)](const asio::error_code& error) mutable {
             if (error) {
-                pm.setError(Solace::Error(error.message(), error.value()));
+                pm.setError(fromAsioError(error));
             } else {
                 pm.setValue();
             }

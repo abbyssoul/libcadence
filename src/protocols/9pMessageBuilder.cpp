@@ -133,8 +133,7 @@ public:
         return (*this);
     }
 
-    P9Encoder& encode(const char* str) {
-        const auto dataSize = static_cast<uint16>(strnlen(str, std::numeric_limits<Solace::uint16>::max()));
+    P9Encoder& encode(const char* str, const uint16 dataSize) {
         encode(dataSize);
         _dest.write(str, dataSize);
 
@@ -142,7 +141,7 @@ public:
     }
 
     P9Encoder& encode(const String& str) {
-        return encode(str.c_str());
+        return encode(str.c_str(), str.size());
     }
 
     P9Encoder& encode(const P9Protocol::Qid& qid) {

@@ -12,6 +12,10 @@ ifeq (g++, $(findstring g++,$(CXX)))
 	AR=gcc-ar
 endif
 
+#ifeq (clang++, $(findstring g++,$(CXX)))
+#	AR=llvm-ar
+#endif
+
 # Project directory layout
 TARGET_DIR = lib
 TARGET_NAME = lib$(PROJECT).a
@@ -67,9 +71,12 @@ CXXFLAGS += -pedantic -Wall -Wextra -Wabi -Wfloat-equal \
 ifdef dbg
 	CXXFLAGS += -O0 -ggdb3 -DDEBUG -D _DEBUG
 	CXXFLAGS += -fstack-protector-all -fsanitize=address,undefined,leak -fno-omit-frame-pointer
+	# FIXME: Doesn't work ????	CXXFLAGS += -fvtable-verify=std
+	CXXFLAGS += -fsanitize-address-use-after-scope
 else # Release optimizations
 	CXXFLAGS += -Ofast -flto
-	CXXFLAGS += -fstack-protector
+	CXXFLAGS += -fstack-protector-strong
+	CXXFLAGS += -march=native -mtune=native
 endif
 
 
@@ -84,7 +91,7 @@ LDFLAGS +=  -L$(TARGET_DIR) \
 
 LDLIBS += -l$(PROJECT) -lsolace -pthread
 ifdef dbg
-	LDLIBS += -lasan -llsan -lubsan
+	LDLIBS += -fsanitize=address -llsan -lubsan
 endif
 
 test_CPPFLAGS += -isystem ${GTEST_DIR}/include

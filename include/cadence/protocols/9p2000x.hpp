@@ -58,15 +58,48 @@ public:
      *  Flags for the mode field in Topen and Tcreate messages
      */
     enum class OpenMode : Solace::byte {
-        READ   = 0,  // open read-only
-        WRITE  = 1,  // open write-only
-        RDWR   = 2,  // open read-write
-        EXEC   = 3,  // execute (== read but check execute permission)
-        TRUNC  = 16, // or'ed in (except for exec), truncate file first
-        CEXEC  = 32, // or'ed in, close on exec
-        RCLOSE = 64, // or'ed in, remove on close
+        READ   = 0,  //!< open read-only
+        WRITE  = 1,  //!< open write-only
+        RDWR   = 2,  //!< open read-write
+        EXEC   = 3,  //!< execute (== read but check execute permission)
+        TRUNC  = 16, //!< or'ed in (except for exec), truncate file first
+        CEXEC  = 32, //!< or'ed in, close on exec
+        RCLOSE = 64, //!< or'ed in, remove on close
     };
 
+    /**
+     * Qid's type as encoded into bit vector corresponding to the high 8 bits of the file's mode word.
+     * Represents the type of a file (directory, etc.).
+     */
+    enum class QidType : Solace::byte {
+        DIR    = 0x80,  //!< directories
+        APPEND = 0x40,  //!< append only files
+        EXCL   = 0x20,  //!< exclusive use files
+        MOUNT  = 0x10,  //!< mounted channel
+        AUTH   = 0x08,  //!< authentication file (afid)
+        TMP    = 0x04,  //!< non-backed-up file
+        FILE   = 0x00,  //!< bits for plain file
+    };
+
+    /* bits in Stat.mode */
+    enum class DirMode : Solace::uint32 {
+        DIR         = 0x80000000,	/* mode bit for directories */
+        APPEND      = 0x40000000,	/* mode bit for append only files */
+        EXCL        = 0x20000000,	/* mode bit for exclusive use files */
+        MOUNT       = 0x10000000,	/* mode bit for mounted channel */
+        AUTH        = 0x08000000,	/* mode bit for authentication file */
+        TMP         = 0x04000000,	/* mode bit for non-backed-up file */
+        SYMLINK     = 0x02000000,	/* mode bit for symbolic link (Unix, 9P2000.u) */
+        DEVICE      = 0x00800000,	/* mode bit for device file (Unix, 9P2000.u) */
+        NAMEDPIPE   = 0x00200000,	/* mode bit for named pipe (Unix, 9P2000.u) */
+        SOCKET      = 0x00100000,	/* mode bit for socket (Unix, 9P2000.u) */
+        SETUID      = 0x00080000,	/* mode bit for setuid (Unix, 9P2000.u) */
+        SETGID      = 0x00040000,	/* mode bit for setgid (Unix, 9P2000.u) */
+
+        READ        = 0x4,		/* mode bit for read permission */
+        WRITE       = 0x2,		/* mode bit for write permission */
+        EXEC        = 0x1,		/* mode bit for execute permission */
+    };
     /**
      * 9P message types
      */
@@ -128,18 +161,18 @@ public:
      * Stat about a file on the server.
      */
     struct Stat {
-        Solace::uint16  size;
-        Solace::uint16  type;
-        Solace::uint32 	dev;
-        Qid             qid;
-        Solace::uint32	mode;
-        Solace::uint32	atime;
-        Solace::uint32	mtime;
-        Solace::uint64	length;
-        Solace::String	name;
-        Solace::String  uid;
-        Solace::String  gid;
-        Solace::String  muid;
+        Solace::uint16  size;   //!< Size of the struct
+        Solace::uint16  type;   /* server type */
+        Solace::uint32 	dev;    /* server subtype */
+        Qid             qid;    /* unique id from server */
+        Solace::uint32	mode;   /* permissions */
+        Solace::uint32	atime;  /* last read time */
+        Solace::uint32	mtime;  /* last write time */
+        Solace::uint64	length; /* file length */
+        Solace::String	name;   /* last element of path */
+        Solace::String  uid;    /* owner name */
+        Solace::String  gid;    /* group name */
+        Solace::String  muid;   /* last modifier name */
     };
 
 
@@ -175,28 +208,45 @@ public:
     };
 
 
+    /**
+     * Request message as decoded from a buffer.
+     */
     struct Request {
 
+        /**
+         * The version request. Must be the first message sent on the connection.
+         * It negotiates the protocol version and message size to be used on the connection and
+         * initializes the connection for I/O.
+         */
         struct Version {
-            size_type       msize;
-            Solace::String  version;
+            size_type       msize;      /// The client suggested maximum message size in bytes.
+            Solace::String  version;    /// The version string identifies the level of the protocol.
         };
 
+        /** Messages to establish a connection
+         *
+         */
         struct Auth {
-            Fid        afid;
-            Solace::String  uname;
-            Solace::String  aname;
+            Fid             afid;       /// A new fid to be established for authentication.
+            Solace::String  uname;      /// User identified by the message.
+            Solace::String  aname;      /// file tree to access.
         };
 
+        /**
+         * Abort a message
+         */
         struct Flush {
             Tag        oldtag;
         };
 
+        /**
+         * A fresh introduction from a user on the client machine to the server.
+         */
         struct Attach {
-            Fid             fid;
-            Fid             afid;
-            Solace::String  uname;
-            Solace::String  aname;
+            Fid             fid;        /// Client fid to be use as the root directory of the desired file tree.
+            Fid             afid;       /// Specifies a fid previously established by an auth message.
+            Solace::String  uname;      /// Username.
+            Solace::String  aname;      /// Selected the file tree to access.
         };
 
         struct Walk {

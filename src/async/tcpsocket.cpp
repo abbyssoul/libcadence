@@ -164,24 +164,51 @@ public:
         return f;
     }
 
-    void accept(TcpSocket::TcpSocketImpl* socket) {
-        _acceptor.accept(socket->getSocket());
+    Result<void, Error>
+    accept(TcpSocket::TcpSocketImpl* socket) {
+        asio::error_code ec;
+        _acceptor.accept(socket->getSocket(), ec);
+
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
     }
 
-    void open(const IPEndpoint& endpoint, int32 backlog, bool reuseAddr = true) {
+    Result<void, Error> open(const IPEndpoint& endpoint, int32 backlog, bool reuseAddr = true) {
+        asio::error_code ec;
+
         auto e = toAsioTCPEndpoint(endpoint);
 
-        if (!_acceptor.is_open())
-            _acceptor.open(e.protocol());
+        if (!_acceptor.is_open()) {
+            _acceptor.open(e.protocol(), ec);
+
+            if (ec) {
+                return Err(fromAsioError(ec));
+            }
+        }
 
 
         if (reuseAddr) {
-          _acceptor.set_option(asio::socket_base::reuse_address(true));
+          _acceptor.set_option(asio::socket_base::reuse_address(true), ec);
+
+          if (ec) {
+              return Err(fromAsioError(ec));
+          }
         }
 
-        _acceptor.bind(e);
-        _acceptor.listen(backlog);
+        _acceptor.bind(e, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
 
+        _acceptor.listen(backlog, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
     }
 
     bool nonBlocking() {
@@ -243,8 +270,9 @@ TcpAcceptor& TcpAcceptor::swap(TcpAcceptor& rhs) noexcept {
     return *this;
 }
 
-void TcpAcceptor::accept(TcpSocket& socket) {
-    _pimpl->accept(socket._pimpl.get());
+Result<void, Error>
+TcpAcceptor::accept(TcpSocket& socket) {
+    return _pimpl->accept(socket._pimpl.get());
 }
 
 bool TcpAcceptor::nonBlocking() {
@@ -260,8 +288,9 @@ void TcpAcceptor::nativeNonBlocking(bool mode) {
 }
 
 
-void TcpAcceptor::open(const IPEndpoint& endpoint, int32 backlog, bool reuseAddr) {
-    _pimpl->open(endpoint, backlog, reuseAddr);
+Result<void, Error>
+TcpAcceptor::open(const IPEndpoint& endpoint, int32 backlog, bool reuseAddr) {
+    return _pimpl->open(endpoint, backlog, reuseAddr);
 }
 
 void TcpAcceptor::cancel() {

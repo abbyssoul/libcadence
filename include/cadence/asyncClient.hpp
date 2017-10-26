@@ -7,7 +7,7 @@
 *  Written by Ivan Ryabov <abbyssoul@gmail.com>
 */
 /*******************************************************************************
- * libcadence: Async UDP socket
+ * libcadence: Async Resource server client
  *	@file		cadence/asyncClient.hpp
  *	@author		$LastChangedBy$
  *	@date		$LastChangedDate$
@@ -60,22 +60,6 @@ public:
         return *this;
     }
 
-
-
-//    /**
-//     * Connect to the resource server synchronously.
-//     * @param endpoint Endpoint to connect to the server.
-//     * @return Future of connection outcome.
-//     */
-//    Solace::Future<void> connect(const NetworkEndpoint& endpoint);
-
-//    /**
-//     * Connect to the resource server asynchronously.
-//     * @param endpoint Endpoint to connect to the server.
-//     * @return Future of connection procedure.
-//     */
-//    Solace::Future<void>
-//    asyncConnect(const NetworkEndpoint& endpoint);
 
     /**
      * Establish a new session with the resource server.

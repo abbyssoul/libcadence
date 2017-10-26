@@ -162,11 +162,14 @@ public:
     bool isOpen();
     bool isClosed();
 
-    void open(const IPEndpoint& endpoint, Solace::int32 backlog, bool reuseAddr = true);
+    Solace::Result<void, Solace::Error>
+    open(const IPEndpoint& endpoint, Solace::int32 backlog, bool reuseAddr = true);
 
-    void accept(TcpSocket& socket);
+    Solace::Result<void, Solace::Error>
+    accept(TcpSocket& socket);
 
-    Solace::Future<void> asyncAccept(TcpSocket& socket);
+    Solace::Future<void>
+    asyncAccept(TcpSocket& socket);
 
     bool nonBlocking();
     bool nativeNonBlocking();

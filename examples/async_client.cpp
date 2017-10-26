@@ -93,10 +93,11 @@ int main(int argc, const char **argv) {
     EventLoop iocontext;
 
     auto socket = std::make_unique<TcpSocket>(iocontext);
-    socket->connect(ipEndpoint)
-            .then([&]() {
-                AsyncClient client(std::move(socket), memManager);
 
+    auto result = socket->connect(ipEndpoint);
+
+    AsyncClient client(std::move(socket), memManager);
+    result.then([&]() {
                 runTestSession(rootName, userName, dir, client);
             }).orElse([&ipEndpoint](Error&& er) {
                 std::cout << "Failed to connect to '" << ipEndpoint << "': " << er.toString() << std::endl;

@@ -38,23 +38,57 @@ public:
      */
     class Node {
     public:
-        virtual ~Node() = default;
+        virtual ~Node();
 
         virtual Solace::Result<void, Solace::Error>
         mount(const Solace::String& pathSegment, std::unique_ptr<Node>&& node) = 0;
 
         virtual Solace::Result<std::shared_ptr<Node>, Solace::Error>
-        walk(const Solace::String& pathSegment) = 0;
+        walk(const Solace::String& pathSegment);
+
+        virtual bool isWalkable() const noexcept {
+            return false;
+        }
+
+        virtual Solace::uint32 getVersion() const noexcept {
+            return 0;
+        }
+
+        virtual Solace::Result<void, Solace::Error>
+        open(const Solace::String& uname, Solace::byte mode) = 0;
+
+        virtual Solace::Result<void, Solace::Error>
+        getStats() = 0;
+
+        virtual Solace::Result<void, Solace::Error>
+        read(Solace::uint32 count, Solace::uint64 offset, Solace::ByteBuffer& buffer) = 0;
+
+        virtual Solace::Result<void, Solace::Error>
+        write(Solace::ImmutableMemoryView data, Solace::uint64 offset) = 0;
     };
 
 
     class DirectoryNode : public Node {
     public:
+
         Solace::Result<void, Solace::Error>
         mount(const Solace::String& pathSegment, std::unique_ptr<Node>&& node) override;
 
         Solace::Result<std::shared_ptr<Node>, Solace::Error>
         walk(const Solace::String& pathSegment) override;
+
+        bool isWalkable() const noexcept override {
+            return true;
+        }
+
+        Solace::Result<void, Solace::Error>
+        open(const Solace::String& uname, Solace::byte mode) override;
+
+        Solace::Result<void, Solace::Error>
+        read(Solace::uint32 count, Solace::uint64 offset, Solace::ByteBuffer& buffer) override;
+
+        Solace::Result<void, Solace::Error>
+        write(Solace::ImmutableMemoryView data, Solace::uint64 offset) override;
 
     private:
 

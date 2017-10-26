@@ -56,26 +56,6 @@ void encode9P(ByteBuffer& dest, const P9Protocol::Stat& stat) {
 
 namespace cadence {
 
-bool operator == (const P9Protocol::Qid& lhs, const P9Protocol::Qid& rhs) {
-    return (lhs.path == rhs.path &&
-            lhs.version == rhs.version &&
-            lhs.type == rhs.type);
-}
-
-bool operator == (const P9Protocol::Stat& lhs, const P9Protocol::Stat& rhs) {
-    return (lhs.atime == rhs.atime &&
-            lhs.dev == rhs.dev &&
-            lhs.gid == rhs.gid &&
-            lhs.length == rhs.length &&
-            lhs.mode == rhs.mode &&
-            lhs.mtime == rhs.mtime &&
-            lhs.name == rhs.name &&
-            lhs.qid == rhs.qid &&
-            lhs.size == rhs.size &&
-            lhs.type == rhs.type &&
-            lhs.uid == rhs.uid);
-}
-
     std::ostream& operator<< (std::ostream& ostr, P9Protocol::MessageType t) {
 
         switch (t) {
@@ -1215,6 +1195,115 @@ TEST_F(P9Messages, parseWStatRespose) {
 
     auto message = proc.parseResponse(header, _buffer);
     ASSERT_TRUE(message.isOk());
+}
+
+
+
+
+TEST_F(P9Messages, createWalkRequest) {
+    P9Protocol proc;
+
+    P9Protocol::RequestBuilder(_buffer)
+            .walk(213, 124, {"knowhere"});
+    auto headerResult = proc.parseMessageHeader(_buffer.flip());
+    ASSERT_TRUE(headerResult.isOk());
+
+    auto header = headerResult.unwrap();
+    ASSERT_EQ(P9Protocol::MessageType::TWalk, header.type);
+
+    // Make sure we can parse the message back.
+    auto message = proc.parseRequest(header, _buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto request = message.moveResult();
+    ASSERT_EQ(213, request.asWalk().fid);
+    ASSERT_EQ(124, request.asWalk().newfid);
+    ASSERT_STREQ("knowhere", request.asWalk().path.toString().c_str());
+}
+
+TEST_F(P9Messages, createWalkEmptyPathRequest) {
+    P9Protocol proc;
+
+    P9Protocol::RequestBuilder(_buffer)
+            .walk(7374, 542, Path());
+    auto headerResult = proc.parseMessageHeader(_buffer.flip());
+    ASSERT_TRUE(headerResult.isOk());
+
+    auto header = headerResult.unwrap();
+    ASSERT_EQ(P9Protocol::MessageType::TWalk, header.type);
+
+    // Make sure we can parse the message back.
+    auto message = proc.parseRequest(header, _buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto request = message.moveResult();
+    ASSERT_EQ(7374, request.asWalk().fid);
+    ASSERT_EQ(542, request.asWalk().newfid);
+    ASSERT_TRUE(request.asWalk().path.empty());
+}
+
+
+TEST_F(P9Messages, createWalkRespose) {
+    P9Protocol proc;
+
+    Array<P9Protocol::Qid> qids(3);
+    qids[2].path = 21;
+    qids[2].version = 117;
+    qids[2].type = 81;
+    P9Protocol::ResponseBuilder(_buffer)
+            .tag(1)
+            .walk(qids);
+
+    auto headerResult = proc.parseMessageHeader(_buffer.flip());
+    ASSERT_TRUE(headerResult.isOk());
+
+    auto header = headerResult.unwrap();
+    ASSERT_EQ(P9Protocol::MessageType::RWalk, header.type);
+
+    // Make sure we can parse the message back.
+    auto message = proc.parseResponse(header, _buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+
+    ASSERT_EQ(qids.size(), response.walk.nqids);
+    ASSERT_EQ(qids[2], response.walk.qids[2]);
+}
+
+TEST_F(P9Messages, parseWalkRespose) {
+    P9Protocol proc;
+
+    // Set declared message size to be more then negotiated message size
+    const auto headPosition = _buffer.position();
+    _buffer << P9Protocol::size_type(0);
+    _buffer << static_cast<byte>(P9Protocol::MessageType::RWalk);
+    _buffer << P9Protocol::Tag(1);
+    // nwqid
+    _buffer << uint16(1);
+    // qid
+    _buffer << byte(87);     // QID.type
+    _buffer << uint32(5481);   // QID.version
+    _buffer << uint64(17);  // QID.path
+
+
+    const auto totalSize = _buffer.position();
+    _buffer.reset(headPosition) << P9Protocol::size_type(totalSize);
+    _buffer.reset(totalSize);
+
+    auto headerResult = proc.parseMessageHeader(_buffer.flip());
+    ASSERT_TRUE(headerResult.isOk());
+
+    auto header = headerResult.unwrap();
+    ASSERT_EQ(P9Protocol::MessageType::RWalk, header.type);
+
+    auto message = proc.parseResponse(header, _buffer);
+    ASSERT_TRUE(message.isOk());
+
+    auto response = message.moveResult();
+    EXPECT_EQ(1, response.walk.nqids);
+    EXPECT_EQ(87, response.walk.qids[0].type);
+    EXPECT_EQ(5481, response.walk.qids[0].version);
+    EXPECT_EQ(17, response.walk.qids[0].path);
 }
 
 

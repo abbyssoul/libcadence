@@ -21,11 +21,10 @@ using namespace cadence;
 
 const P9Protocol::size_type P9Protocol::MAX_MESSAGE_SIZE = 8*1024;      // 8k should be enough for everyone, am I right?
 const String                P9Protocol::PROTOCOL_VERSION = "9P2000.e";  // By default we want to talk via 9P2000.e proc
+const String                P9Protocol::UNKNOWN_PROTOCOL_VERSION = "unknown";
 const P9Protocol::Tag       P9Protocol::NO_TAG = static_cast<P9Protocol::Tag>(~0);
-const P9Protocol::Fid  P9Protocol::NOFID = static_cast<P9Protocol::Fid>(~0);
+const P9Protocol::Fid       P9Protocol::NOFID = static_cast<P9Protocol::Fid>(~0);
 
-
-// static const char* UNKNOWN_PROTOCOL_VERSION = "unknown";
 
 
 P9Protocol::P9Decoder&
@@ -323,6 +322,7 @@ parseWalkRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     auto& msg = fcall.asWalk();
     P9Protocol::P9Decoder(data)
             .read(&msg.fid)
+            .read(&msg.newfid)
             .read(&msg.path);
 
     return Ok(std::move(fcall));

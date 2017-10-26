@@ -45,6 +45,12 @@ public:
     static const Solace::String PROTOCOL_VERSION;
 
     /**
+     * String const for unknow version.
+     */
+    static const Solace::String UNKNOWN_PROTOCOL_VERSION;
+
+
+    /**
      * Special value of a message tag representing 'no tag'.
      */
     static const Tag NO_TAG;
@@ -198,6 +204,45 @@ public:
         Solace::ByteBuffer& _src;
     };
 
+
+    /**
+     * Helper class to encode data into the protocol message format.
+     */
+    class Encoder {
+    public:
+
+        Encoder(Solace::ByteBuffer& dest) :
+            _dest(dest)
+        {}
+
+        Encoder& header(MessageType type, Tag tag, size_type payloadSize = 0);
+        Encoder& encode(Solace::uint8 value);
+        Encoder& encode(Solace::uint16 value);
+        Encoder& encode(Solace::uint32 value);
+        Encoder& encode(Solace::uint64 value);
+        Encoder& encode(const char* str, const Solace::uint16 dataSize);
+        Encoder& encode(const Solace::String& str);
+        Encoder& encode(const P9Protocol::Qid& qid);
+        Encoder& encode(const Solace::Array<P9Protocol::Qid>& qids);
+        Encoder& encode(const P9Protocol::Stat& stat);
+        Encoder& encode(const Solace::ImmutableMemoryView& data);
+        Encoder& encode(const Solace::Path& path);
+
+        size_type protocolSize(const Solace::uint8& value);
+        size_type protocolSize(const Solace::uint16& value);
+        size_type protocolSize(const Solace::uint32& value);
+        size_type protocolSize(const Solace::uint64& value);
+        size_type protocolSize(const Solace::String& str);
+        size_type protocolSize(const Solace::Path& path);
+        size_type protocolSize(const P9Protocol::Qid&);
+        size_type protocolSize(const P9Protocol::Stat& stat);
+        size_type protocolSize(const Solace::Array<P9Protocol::Qid>& qids);
+        size_type protocolSize(const Solace::ImmutableMemoryView& data);
+
+    private:
+        Solace::ByteBuffer& _dest;
+    };
+
     /**
      * Common header that all messages have.
      */
@@ -227,9 +272,9 @@ public:
          *
          */
         struct Auth {
-            Fid             afid;       /// A new fid to be established for authentication.
-            Solace::String  uname;      /// User identified by the message.
-            Solace::String  aname;      /// file tree to access.
+            Fid             afid;       //!< A new fid to be established for authentication.
+            Solace::String  uname;      //!< User identified by the message.
+            Solace::String  aname;      //!< file tree to access.
         };
 
         /**
@@ -243,10 +288,10 @@ public:
          * A fresh introduction from a user on the client machine to the server.
          */
         struct Attach {
-            Fid             fid;        /// Client fid to be use as the root directory of the desired file tree.
-            Fid             afid;       /// Specifies a fid previously established by an auth message.
-            Solace::String  uname;      /// Username.
-            Solace::String  aname;      /// Selected the file tree to access.
+            Fid             fid;        //!< Client fid to be use as the root directory of the desired file tree.
+            Fid             afid;       //!< Specifies a fid previously established by an auth message.
+            Solace::String  uname;      //!< Idnetification of a user. All actions will be performed as this user name.
+            Solace::String  aname;      //!< Selected file-tree to attach to.
         };
 
         struct Walk {
@@ -292,8 +337,8 @@ public:
         };
 
         struct WStat {
-            Fid        fid;
-            Stat            stat;
+            Fid         fid;
+            Stat        stat;
         };
 
 
@@ -511,7 +556,9 @@ public:
             return _buffer;
         }
 
-        Solace::ByteBuffer& build();
+        Solace::ByteBuffer& build() {
+            return _buffer.flip();
+        }
 
         /**
          * Set response message tag
@@ -528,6 +575,10 @@ public:
         ResponseBuilder& version(const Solace::String& version, size_type maxMessageSize = MAX_MESSAGE_SIZE);
         ResponseBuilder& auth(const Qid& qid);
         ResponseBuilder& error(const Solace::String& message);
+        ResponseBuilder& error(const Solace::Error& err) {
+            return error(err.toString());
+        }
+
         ResponseBuilder& flush();
         ResponseBuilder& attach(const Qid& qid);
         ResponseBuilder& walk(const Solace::Array<Qid>& qids);
@@ -609,6 +660,30 @@ private:
     Solace::String  _initialVersion;
     Solace::String  _negotiatedVersion;
 };
+
+
+inline
+bool operator == (const P9Protocol::Qid& lhs, const P9Protocol::Qid& rhs) {
+    return (lhs.path == rhs.path &&
+            lhs.version == rhs.version &&
+            lhs.type == rhs.type);
+}
+
+
+inline
+bool operator == (const P9Protocol::Stat& lhs, const P9Protocol::Stat& rhs) {
+    return (lhs.atime == rhs.atime &&
+            lhs.dev == rhs.dev &&
+            lhs.gid == rhs.gid &&
+            lhs.length == rhs.length &&
+            lhs.mode == rhs.mode &&
+            lhs.mtime == rhs.mtime &&
+            lhs.name == rhs.name &&
+            lhs.qid == rhs.qid &&
+            lhs.size == rhs.size &&
+            lhs.type == rhs.type &&
+            lhs.uid == rhs.uid);
+}
 
 }  // end of namespace cadence
 #endif  // CADENCE_PROTOCOLS_9P2000X_HPP

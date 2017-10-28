@@ -233,7 +233,9 @@ Result<P9Protocol::Response, Error>
 parseStatResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
+    uint16 dummySize;
     P9Protocol::P9Decoder(data)
+            .read(&dummySize)
             .read(&fcall.stat);
 
     return Ok(std::move(fcall));

@@ -184,7 +184,7 @@ AsyncClient::doAuth(const String& resource, const String& cred) {
 
 
 Future<void>
-AsyncClient::doAuthDance(const P9Protocol::Qid& authQid, const String& userName, const String& rootName) {
+AsyncClient::doAuthDance(const P9Protocol::Qid& /*authQid*/, const String& userName, const String& /*rootName*/) {
     auto& tx = _transactionPool.allocateTransaction();
 
     String token = userName;  // FIXME: Do a better auth

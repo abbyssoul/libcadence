@@ -95,6 +95,7 @@ public:
         MOUNT       = 0x10000000,	/* mode bit for mounted channel */
         AUTH        = 0x08000000,	/* mode bit for authentication file */
         TMP         = 0x04000000,	/* mode bit for non-backed-up file */
+
         SYMLINK     = 0x02000000,	/* mode bit for symbolic link (Unix, 9P2000.u) */
         DEVICE      = 0x00800000,	/* mode bit for device file (Unix, 9P2000.u) */
         NAMEDPIPE   = 0x00200000,	/* mode bit for named pipe (Unix, 9P2000.u) */
@@ -167,18 +168,18 @@ public:
      * Stat about a file on the server.
      */
     struct Stat {
-        Solace::uint16  size;   //!< Size of the struct
-        Solace::uint16  type;   /* server type */
-        Solace::uint32 	dev;    /* server subtype */
-        Qid             qid;    /* unique id from server */
-        Solace::uint32	mode;   /* permissions */
-        Solace::uint32	atime;  /* last read time */
-        Solace::uint32	mtime;  /* last write time */
-        Solace::uint64	length; /* file length */
-        Solace::String	name;   /* last element of path */
-        Solace::String  uid;    /* owner name */
-        Solace::String  gid;    /* group name */
-        Solace::String  muid;   /* last modifier name */
+        Solace::uint16  size;   //!< Total byte count of the following data
+        Solace::uint16  type;   //!< server type (for kernel use)
+        Solace::uint32 	dev;    //!< server subtype (for kernel use)
+        Qid             qid;    //!< unique id from server, @see Qid
+        Solace::uint32	mode;   //!< permissions and flags
+        Solace::uint32	atime;  //!< last read time
+        Solace::uint32	mtime;  //!< last write time
+        Solace::uint64	length; //!< length of the file in bytes
+        Solace::String	name;   //!< file name; must be '/' if the file is the root directory of the server
+        Solace::String  uid;    //!< owner name
+        Solace::String  gid;    //!< group name
+        Solace::String  muid;   //!< name of the user who last modified the file
     };
 
 
@@ -220,7 +221,7 @@ public:
         Encoder& encode(Solace::uint16 value);
         Encoder& encode(Solace::uint32 value);
         Encoder& encode(Solace::uint64 value);
-        Encoder& encode(const char* str, const Solace::uint16 dataSize);
+        Encoder& encode(const Solace::uint16 dataSize, const char* str);
         Encoder& encode(const Solace::String& str);
         Encoder& encode(const P9Protocol::Qid& qid);
         Encoder& encode(const Solace::Array<P9Protocol::Qid>& qids);
@@ -440,6 +441,7 @@ public:
         }
 
         Tag tag() const { return _tag; }
+        MessageType type() const { return _type; }
 
         /**
          * Create a version request.
@@ -473,6 +475,7 @@ public:
 
     private:
         Tag                     _tag;
+        MessageType             _type;
         Solace::ByteBuffer&     _buffer;
     };
 
@@ -556,9 +559,7 @@ public:
             return _buffer;
         }
 
-        Solace::ByteBuffer& build() {
-            return _buffer.flip();
-        }
+        Solace::ByteBuffer& build();
 
         /**
          * Set response message tag
@@ -571,6 +572,7 @@ public:
         }
 
         Tag tag() const { return _tag; }
+        MessageType type() const { return _type; }
 
         ResponseBuilder& version(const Solace::String& version, size_type maxMessageSize = MAX_MESSAGE_SIZE);
         ResponseBuilder& auth(const Qid& qid);
@@ -598,6 +600,7 @@ public:
 
     private:
         Tag                     _tag;
+        MessageType             _type;
         Solace::ByteBuffer&     _buffer;
     };
 

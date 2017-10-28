@@ -1090,6 +1090,7 @@ TEST_F(P9Messages, parseStatRespose) {
     _buffer << P9Protocol::size_type(0);
     _buffer << static_cast<byte>(P9Protocol::MessageType::RStat);
     _buffer << P9Protocol::Tag(1);
+    _buffer << uint16(1);
 
     P9Protocol::Stat stat;
     stat.atime = 21;

@@ -85,6 +85,9 @@ public:
         open(const Solace::String& uname, Solace::byte mode) override;
 
         Solace::Result<void, Solace::Error>
+        getStats() override;
+
+        Solace::Result<void, Solace::Error>
         read(Solace::uint32 count, Solace::uint64 offset, Solace::ByteBuffer& buffer) override;
 
         Solace::Result<void, Solace::Error>
@@ -109,6 +112,9 @@ public:
 protected:
 
     void doAccept();
+
+    class Session;
+    std::shared_ptr<Session> spawnSession();
 
 private:
 

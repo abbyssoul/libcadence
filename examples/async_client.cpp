@@ -59,7 +59,7 @@ int main(int argc, const char **argv) {
     P9Protocol::size_type bufferSize = P9Protocol::MAX_MESSAGE_SIZE;
     uint16 serverPort = 5640;
     String userName;
-    String rootName;
+    String rootName("");
     String serverEndpoint("127.0.0.1");
     String dir("data");
 
@@ -97,7 +97,8 @@ int main(int argc, const char **argv) {
     auto result = socket->connect(ipEndpoint);
 
     AsyncClient client(std::move(socket), memManager);
-    result.then([&]() {
+    result
+            .then([&]() {
                 runTestSession(rootName, userName, dir, client);
             }).orElse([&ipEndpoint](Error&& er) {
                 std::cout << "Failed to connect to '" << ipEndpoint << "': " << er.toString() << std::endl;

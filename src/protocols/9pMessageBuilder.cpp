@@ -44,8 +44,8 @@ P9Protocol::Encoder::protocolSize(const uint64& value) {
 
 P9Protocol::size_type
 P9Protocol::Encoder::protocolSize(const String& str) {
-    return sizeof(uint16) +                     // String size var
-            static_cast<uint16>(str.size());    // Space for the actual string bytes
+    return sizeof(uint16) +         // Space for string var size
+            str.size();             // Space for the actual string bytes
 }
 
 
@@ -142,7 +142,7 @@ P9Protocol::Encoder::encode(uint64 value) {
 }
 
 P9Protocol::Encoder&
-P9Protocol::Encoder::encode(const char* str, const uint16 dataSize) {
+P9Protocol::Encoder::encode(const uint16 dataSize, const char* str) {
     encode(dataSize);
     _dest.write(str, dataSize);
 
@@ -151,7 +151,7 @@ P9Protocol::Encoder::encode(const char* str, const uint16 dataSize) {
 
 P9Protocol::Encoder&
 P9Protocol::Encoder::encode(const String& str) {
-    return encode(str.c_str(), str.size());
+    return encode(str.size(), str.c_str());
 }
 
 P9Protocol::Encoder&
@@ -212,6 +212,17 @@ P9Protocol::Encoder::encode(const Path& path) {
 // Request Builder
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+ByteBuffer&
+P9Protocol::RequestBuilder::build() {
+    if (type() < MessageType::_beginSupportedMessageCode ||
+        type() > MessageType::_endSupportedMessageCode) {
+        Solace::raise<IOException>("Unexpected message type");
+    }
+
+    return _buffer.flip();
+}
+
+
 P9Protocol::RequestBuilder&
 P9Protocol::RequestBuilder::version(const String& version, size_type maxMessageSize) {
     Encoder encode(buffer());
@@ -223,7 +234,8 @@ P9Protocol::RequestBuilder::version(const String& version, size_type maxMessageS
 
     // Note: we ignore what ever tag value been passed and use NO_TAG value as per protocol.
     _tag = NO_TAG;
-    encode.header(MessageType::TVersion, NO_TAG, payloadSize)
+    _type = MessageType::TVersion;
+    encode.header(type(), NO_TAG, payloadSize)
             .encode(maxMessageSize)
             .encode(version);
 
@@ -241,7 +253,8 @@ P9Protocol::RequestBuilder::auth(Fid afid, const String& userName, const String&
             encode.protocolSize(userName) +       // User name
             encode.protocolSize(attachName);     // Root name where we want to attach to
 
-    encode.header(MessageType::TAuth, _tag, payloadSize)
+    _type = MessageType::TAuth;
+    encode.header(type(), _tag, payloadSize)
             .encode(afid)
             .encode(userName)
             .encode(attachName);
@@ -261,7 +274,8 @@ P9Protocol::RequestBuilder::attach(Fid fid, Fid afid, const String& userName, co
             encode.protocolSize(userName) +      // User name
             encode.protocolSize(attachName);     // Root name where we want to attach to
 
-    encode.header(MessageType::TAttach, _tag, payloadSize)
+    _type = MessageType::TAttach;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid)
             .encode(afid)
             .encode(userName)
@@ -279,7 +293,8 @@ P9Protocol::RequestBuilder::clunk(Fid fid) {
     const size_type payloadSize =
             encode.protocolSize(fid);               // Fid to forget
 
-    encode.header(MessageType::TClunk, _tag, payloadSize)
+    _type = MessageType::TClunk;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid);
 
     return (*this);
@@ -294,7 +309,8 @@ P9Protocol::RequestBuilder::flush(Tag oldTransation) {
     const size_type payloadSize =
             encode.protocolSize(oldTransation);               // Transaction to forget
 
-    encode.header(MessageType::TFlush, _tag, payloadSize)
+    _type = MessageType::TFlush;
+    encode.header(type(), _tag, payloadSize)
             .encode(oldTransation);
 
     return (*this);
@@ -309,7 +325,8 @@ P9Protocol::RequestBuilder::remove(Fid fid) {
     const size_type payloadSize =
             encode.protocolSize(fid);               // Fid to remove
 
-    encode.header(MessageType::TRemove, _tag, payloadSize)
+    _type = MessageType::TRemove;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid);
 
     return (*this);
@@ -325,7 +342,8 @@ P9Protocol::RequestBuilder::open(Fid fid, P9Protocol::OpenMode mode) {
             encode.protocolSize(fid) +                // Fid of the file to open
             encode.protocolSize(static_cast<byte>(mode));                // Mode of the file to open
 
-    encode.header(MessageType::TOpen, _tag, payloadSize)
+    _type = MessageType::TOpen;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid)
             .encode(static_cast<byte>(mode));
 
@@ -344,7 +362,8 @@ P9Protocol::RequestBuilder::create(Fid fid, const String& name, uint32 permissio
             encode.protocolSize(permissions) +
             encode.protocolSize(static_cast<byte>(mode));
 
-    encode.header(MessageType::TCreate, _tag, payloadSize)
+    _type = MessageType::TCreate;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid)
             .encode(name)
             .encode(permissions)
@@ -364,7 +383,8 @@ P9Protocol::RequestBuilder::read(Fid fid, uint64 offset, size_type count) {
             encode.protocolSize(offset) +
             encode.protocolSize(count);
 
-    encode.header(MessageType::TRead, _tag, payloadSize)
+    _type = MessageType::TRead;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid)
             .encode(offset)
             .encode(count);
@@ -383,7 +403,8 @@ P9Protocol::RequestBuilder::write(Fid fid, uint64 offset, const ImmutableMemoryV
             encode.protocolSize(offset) +
             encode.protocolSize(data);
 
-    encode.header(MessageType::TWrite, _tag, payloadSize)
+    _type = MessageType::TWrite;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid)
             .encode(offset)
             .encode(data);
@@ -402,7 +423,8 @@ P9Protocol::RequestBuilder::walk(Fid fid, Fid nfid, const Path& path) {
             encode.protocolSize(nfid) +
             encode.protocolSize(path);
 
-    encode.header(MessageType::TWalk, _tag, payloadSize)
+    _type = MessageType::TWalk;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid)
             .encode(nfid)
             .encode(path);
@@ -419,7 +441,8 @@ P9Protocol::RequestBuilder::stat(Fid fid) {
     const size_type payloadSize =
             encode.protocolSize(fid);
 
-    encode.header(MessageType::TStat, _tag, payloadSize)
+    _type = MessageType::TStat;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid);
 
     return (*this);
@@ -435,7 +458,8 @@ P9Protocol::RequestBuilder::writeStat(Fid fid, const Stat& stat) {
             encode.protocolSize(fid) +
             encode.protocolSize(stat);
 
-    encode.header(MessageType::TWStat, _tag, payloadSize)
+    _type = MessageType::TWStat;
+    encode.header(type(), _tag, payloadSize)
             .encode(fid)
             .encode(stat);
 
@@ -450,8 +474,9 @@ P9Protocol::RequestBuilder::session(const ImmutableMemoryView& key) {
             8;  // Key size is fixed to be 8 bites.
 //            protocolSize(key);
 
+    _type = MessageType::TSession;
     Encoder(buffer())
-            .header(MessageType::TSession, _tag, payloadSize);
+            .header(type(), _tag, payloadSize);
 //            .encode(key);
     buffer().write(key, 8);
 
@@ -467,7 +492,8 @@ P9Protocol::RequestBuilder::shortRead(Fid rootFid, const Path& path) {
             encode.protocolSize(rootFid) +
             encode.protocolSize(path);
 
-    encode.header(MessageType::TSRead, _tag, payloadSize)
+    _type = MessageType::TSRead;
+    encode.header(type(), _tag, payloadSize)
             .encode(rootFid)
             .encode(path);
 
@@ -484,7 +510,8 @@ P9Protocol::RequestBuilder::shortWrite(Fid rootFid, const Path& path, const Immu
             encode.protocolSize(path) +
             encode.protocolSize(data);
 
-    encode.header(MessageType::TSWrite, _tag, payloadSize)
+    _type = MessageType::TSWrite;
+    encode.header(type(), _tag, payloadSize)
             .encode(rootFid)
             .encode(path)
             .encode(data);
@@ -497,6 +524,17 @@ P9Protocol::RequestBuilder::shortWrite(Fid rootFid, const Path& path, const Immu
 // Response Builder
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+ByteBuffer&
+P9Protocol::ResponseBuilder::build() {
+    if (type() < MessageType::_beginSupportedMessageCode ||
+        type() > MessageType::_endSupportedMessageCode) {
+        Solace::raise<IOException>("Unexpected message type");
+    }
+
+    return _buffer.flip();
+}
+
+
 P9Protocol::ResponseBuilder&
 P9Protocol::ResponseBuilder::version(const String& version, size_type maxMessageSize) {
     Encoder encode(buffer());
@@ -506,7 +544,8 @@ P9Protocol::ResponseBuilder::version(const String& version, size_type maxMessage
             encode.protocolSize(maxMessageSize) +                // Negotiated message size field
             encode.protocolSize(version);   // Version string data
 
-    encode.header(MessageType::RVersion, NO_TAG, payloadSize)
+    _type = MessageType::RVersion;
+    encode.header(type(), NO_TAG, payloadSize)
             .encode(maxMessageSize)
             .encode(version);
 
@@ -521,7 +560,8 @@ P9Protocol::ResponseBuilder::auth(const Qid& qid) {
     const size_type payloadSize =
             encode.protocolSize(qid);   // Version string data
 
-    encode.header(MessageType::RAuth, _tag, payloadSize)
+    _type = MessageType::RAuth;
+    encode.header(type(), _tag, payloadSize)
             .encode(qid);
 
     return (*this);
@@ -535,7 +575,8 @@ P9Protocol::ResponseBuilder::error(const String& message) {
     const size_type payloadSize =
             encode.protocolSize(message);   // Version string data
 
-    encode.header(MessageType::RError, _tag, payloadSize)
+    _type = MessageType::RError;
+    encode.header(type(), _tag, payloadSize)
             .encode(message);
 
     return (*this);
@@ -543,8 +584,10 @@ P9Protocol::ResponseBuilder::error(const String& message) {
 
 P9Protocol::ResponseBuilder&
 P9Protocol::ResponseBuilder::flush() {
+    _type = MessageType::RFlush;
+
     Encoder(buffer())
-            .header(MessageType::RFlush, _tag);
+            .header(type(), _tag);
 
     return (*this);
 }
@@ -558,7 +601,8 @@ P9Protocol::ResponseBuilder::attach(const Qid& qid) {
     const size_type payloadSize =
             encode.protocolSize(qid);   // Version string data
 
-    encode.header(MessageType::RAttach, _tag, payloadSize)
+    _type = MessageType::RAttach;
+    encode.header(type(), _tag, payloadSize)
             .encode(qid);
 
     return (*this);
@@ -572,7 +616,8 @@ P9Protocol::ResponseBuilder::walk(const Array<Qid>& qids) {
     const size_type payloadSize =
             encode.protocolSize(qids);   // Version string data
 
-    encode.header(MessageType::RWalk, _tag, payloadSize)
+    _type = MessageType::RWalk;
+    encode.header(type(), _tag, payloadSize)
             .encode(qids);
 
     return (*this);
@@ -587,7 +632,8 @@ P9Protocol::ResponseBuilder::open(const Qid& qid, size_type iounit) {
             encode.protocolSize(qid) +
             encode.protocolSize(iounit);
 
-    encode.header(MessageType::ROpen, _tag, payloadSize)
+    _type = MessageType::ROpen;
+    encode.header(type(), _tag, payloadSize)
             .encode(qid)
             .encode(iounit);
 
@@ -604,7 +650,8 @@ P9Protocol::ResponseBuilder::create(const Qid& qid, size_type iounit) {
             encode.protocolSize(qid) +
             encode.protocolSize(iounit);
 
-    encode.header(MessageType::RCreate, _tag, payloadSize)
+    _type = MessageType::RCreate;
+    encode.header(type(), _tag, payloadSize)
             .encode(qid)
             .encode(iounit);
 
@@ -620,7 +667,8 @@ P9Protocol::ResponseBuilder::read(const ImmutableMemoryView& data) {
     const size_type payloadSize =
             encode.protocolSize(data);
 
-    encode.header(MessageType::RRead, _tag, payloadSize)
+    _type = MessageType::RRead;
+    encode.header(type(), _tag, payloadSize)
             .encode(data);
 
     return (*this);
@@ -635,7 +683,8 @@ P9Protocol::ResponseBuilder::write(size_type count) {
     const size_type payloadSize =
             encode.protocolSize(count);
 
-    encode.header(MessageType::RWrite, _tag, payloadSize)
+    _type = MessageType::RWrite;
+    encode.header(type(), _tag, payloadSize)
             .encode(count);
 
     return (*this);
@@ -644,8 +693,10 @@ P9Protocol::ResponseBuilder::write(size_type count) {
 
 P9Protocol::ResponseBuilder&
 P9Protocol::ResponseBuilder::clunk() {
+    _type = MessageType::RClunk;
+
     Encoder(buffer())
-            .header(MessageType::RClunk, _tag);
+            .header(type(), _tag);
 
     return (*this);
 }
@@ -653,8 +704,10 @@ P9Protocol::ResponseBuilder::clunk() {
 
 P9Protocol::ResponseBuilder&
 P9Protocol::ResponseBuilder::remove() {
+    _type = MessageType::RRemove;
+
     Encoder(buffer())
-            .header(MessageType::RRemove, _tag);
+            .header(type(), _tag);
 
     return (*this);
 }
@@ -666,9 +719,12 @@ P9Protocol::ResponseBuilder::stat(const Stat& data) {
 
     // Compute message size first:
     const size_type payloadSize =
+            sizeof(uint16) +
             encode.protocolSize(data);
 
-    encode.header(MessageType::RStat, _tag, payloadSize)
+    _type = MessageType::RStat;
+    encode.header(type(), _tag, payloadSize)
+            .encode(static_cast<uint16>(payloadSize))
             .encode(data);
 
     return (*this);
@@ -677,8 +733,10 @@ P9Protocol::ResponseBuilder::stat(const Stat& data) {
 
 P9Protocol::ResponseBuilder&
 P9Protocol::ResponseBuilder::wstat() {
+    _type = MessageType::RWStat;
+
     Encoder(buffer())
-            .header(MessageType::RWStat, _tag);
+            .header(type(), _tag);
 
     return (*this);
 }
@@ -686,8 +744,10 @@ P9Protocol::ResponseBuilder::wstat() {
 
 P9Protocol::ResponseBuilder&
 P9Protocol::ResponseBuilder::session() {
+    _type = MessageType::RSession;
+
     Encoder(buffer())
-            .header(MessageType::RSession, _tag);
+            .header(type(), _tag);
 
     return (*this);
 }
@@ -702,7 +762,8 @@ P9Protocol::ResponseBuilder::shortRead(const ImmutableMemoryView& data) {
     const size_type payloadSize =
             encode.protocolSize(data);
 
-    encode.header(MessageType::RSRead, _tag, payloadSize)
+    _type = MessageType::RSRead;
+    encode.header(type(), _tag, payloadSize)
             .encode(data);
 
     return (*this);
@@ -717,7 +778,8 @@ P9Protocol::ResponseBuilder::shortWrite(size_type count) {
     const size_type payloadSize =
             encode.protocolSize(count);
 
-    encode.header(MessageType::RSWrite, _tag, payloadSize)
+    _type = MessageType::RSWrite;
+    encode.header(type(), _tag, payloadSize)
             .encode(count);
 
     return (*this);

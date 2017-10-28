@@ -50,6 +50,7 @@ public:
 
     AsyncClient& swap(AsyncClient& rhs) noexcept {
         using std::swap;
+        swap(_memoryManage, _memoryManage);
         swap(_socket, rhs._socket);
         swap(_resourceProtocol, rhs._resourceProtocol);
         swap(_authFid, rhs._authFid);

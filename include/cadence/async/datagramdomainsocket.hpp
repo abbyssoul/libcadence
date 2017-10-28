@@ -110,11 +110,13 @@ public:
      *
      * @param src The provided source buffer to read data from.
      * @param bytesToWrite Amount of data (in bytes) to write from the buffer into this IO object.
+     * @param endpoint A remote end point to send bytes to.
      * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncWriteTo(Solace::ByteBuffer& src, std::size_t bytesToWrite, const NetworkEndpoint& endpoint);
+    Solace::Future<void>
+    asyncWriteTo(Solace::ByteBuffer& src, std::size_t bytesToWrite, const NetworkEndpoint& endpoint);
 
     /**
      * Cancel all asynchronous operations associated with the socket.

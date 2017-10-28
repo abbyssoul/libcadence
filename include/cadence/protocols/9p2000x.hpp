@@ -64,13 +64,13 @@ public:
      *  Flags for the mode field in Topen and Tcreate messages
      */
     enum class OpenMode : Solace::byte {
-        READ   = 0,  //!< open read-only
-        WRITE  = 1,  //!< open write-only
-        RDWR   = 2,  //!< open read-write
-        EXEC   = 3,  //!< execute (== read but check execute permission)
-        TRUNC  = 16, //!< or'ed in (except for exec), truncate file first
-        CEXEC  = 32, //!< or'ed in, close on exec
-        RCLOSE = 64, //!< or'ed in, remove on close
+        READ   = 0,     //!< open read-only
+        WRITE  = 1,     //!< open write-only
+        RDWR   = 2,     //!< open read-write
+        EXEC   = 3,     //!< execute (== read but check execute permission)
+        TRUNC  = 16,    //!< or'ed in (except for exec), truncate file first
+        CEXEC  = 32,    //!< or'ed in, close on exec
+        RCLOSE = 64,    //!< or'ed in, remove on close
     };
 
     /**
@@ -168,18 +168,18 @@ public:
      * Stat about a file on the server.
      */
     struct Stat {
-        Solace::uint16  size;   //!< Total byte count of the following data
-        Solace::uint16  type;   //!< server type (for kernel use)
-        Solace::uint32 	dev;    //!< server subtype (for kernel use)
-        Qid             qid;    //!< unique id from server, @see Qid
-        Solace::uint32	mode;   //!< permissions and flags
-        Solace::uint32	atime;  //!< last read time
-        Solace::uint32	mtime;  //!< last write time
-        Solace::uint64	length; //!< length of the file in bytes
-        Solace::String	name;   //!< file name; must be '/' if the file is the root directory of the server
-        Solace::String  uid;    //!< owner name
-        Solace::String  gid;    //!< group name
-        Solace::String  muid;   //!< name of the user who last modified the file
+        Solace::uint16  size;       //!< Total byte count of the following data
+        Solace::uint16  type;       //!< server type (for kernel use)
+        Solace::uint32 	dev;        //!< server subtype (for kernel use)
+        Qid             qid;        //!< unique id from server, @see Qid
+        Solace::uint32	mode;       //!< permissions and flags
+        Solace::uint32	atime;      //!< last read time
+        Solace::uint32	mtime;      //!< last write time
+        Solace::uint64	length;     //!< length of the file in bytes
+        Solace::String	name;       //!< file name; must be '/' if the file is the root directory of the server
+        Solace::String  uid;        //!< owner name
+        Solace::String  gid;        //!< group name
+        Solace::String  muid;       //!< name of the user who last modified the file
     };
 
 

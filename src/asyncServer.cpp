@@ -55,7 +55,7 @@ AsyncServer::DirectoryNode::walk(const Solace::String& pathSegment) {
 
 Result<void, Error>
 AsyncServer::DirectoryNode::open(const String& uname, byte mode) {
-    // TODO: Check ACL if user identified by uname can has access.
+    // TODO(abbyssoul): Check ACL if user identified by uname can has access.
 
     return Ok();
 }

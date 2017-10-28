@@ -103,7 +103,7 @@ P9Protocol::Stat nodeStats(const String& name, const std::shared_ptr<AsyncServer
 
 Result<std::shared_ptr<AsyncServer::Node>, Error>
 walk(const std::shared_ptr<AsyncServer::DirectoryNode>& root, const Path& path, Array<P9Protocol::Qid>& qids) {
-    std::shared_ptr<AsyncServer::Node> node(root); //, [](AsyncServer::Node*){});
+    std::shared_ptr<AsyncServer::Node> node(root);
 
     Array<P9Protocol::Qid>::size_type i = 0;
     for (const auto& pathComponent : path) {
@@ -166,7 +166,7 @@ private:
 
         _uname = req.uname;
 
-        // TODO: Implement auth middlewere
+        // TODO(abbyssoul): Implement auth middlewere
         responseBuilder.error("Auth not supported");
     }
 
@@ -346,7 +346,7 @@ private:
 
 
                                 _socket.asyncRead(_buffer.clear(), payloadSize)
-                                    .then([msgHeader = std::move(header), self=std::move(self), this]() {
+                                    .then([msgHeader = std::move(header), self = std::move(self), this]() {
 
                                         _protocol.parseRequest(msgHeader, _buffer.flip())
                                             .then([this](P9Protocol::Request&& req) {
@@ -359,6 +359,11 @@ private:
                     }).orElse([](Error&& e){
                         std::cout << "Failed to parse message header: " << e.toString() << std::endl;
                     });
+                })
+                .onError([](Error&& e) {
+                    std::cout << "Failed to read data from the socket: " << e.toString() <<
+                                 " - closing connection." <<
+                                 std::endl;
                 });
     }
 
@@ -380,7 +385,7 @@ private:
     ByteBuffer  _buffer;
     ByteBuffer  _readBuffer;    // Temporary
 
-    // TODO: Better credential handling:
+    // TODO(abbyssoul): Better credential handling:
     String      _uname;
 
     AsyncServer::DirectoryNode&                     _serverRoot;
@@ -391,7 +396,7 @@ private:
 
 std::shared_ptr<AsyncServer::Session>
 AsyncServer::spawnSession() {
-    // TODO: Pick a free buffer from a pre-allocated pool or reject connection if non avaliable.
+    // TODO(abbyssoul): Pick a free buffer from a pre-allocated pool or reject connection if non avaliable.
     ByteBuffer msgBuf(_memManager.create(P9Protocol::MAX_MESSAGE_SIZE));
     ByteBuffer readBuf(_memManager.create(P9Protocol::MAX_MESSAGE_SIZE));
 

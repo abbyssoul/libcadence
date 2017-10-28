@@ -353,7 +353,7 @@ AsyncClient::write(const Path& path, const Solace::ImmutableMemoryView& data) {
 Future<Array<Path>>
 AsyncClient::readDir(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type iounit, std::vector<Path>&& lst) {
     return read(fid, offset, iounit)
-            .then([this, fid, iounit, offset, l=std::move(lst)](MemoryView&& data) mutable {
+            .then([this, fid, iounit, offset, l = std::move(lst)](MemoryView&& data) mutable {
                 const auto dataSize = data.size();
                 if (dataSize > 0) {
                     ByteBuffer b(std::move(data));
@@ -375,7 +375,7 @@ AsyncClient::readDir(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type i
 
 
 Future<Array<Path>>
-AsyncClient::list(const Path& path) { 
+AsyncClient::list(const Path& path) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
 

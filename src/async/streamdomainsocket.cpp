@@ -96,6 +96,31 @@ public:
         return f;
     }
 
+    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+        asio::error_code ec;
+
+        const auto len = asio::read(_socket, asio_buffer(dest, bytesToRead), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            dest.advance(len);
+        }
+
+        return Ok();
+    }
+
+    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+        asio::error_code ec;
+
+        const auto len = asio::write(_socket, asio_buffer(src, bytesToWrite), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            src.advance(len);
+        }
+
+        return Ok();
+    }
 
     asio::local::stream_protocol::socket& getSocket() noexcept { return _socket; }
 
@@ -132,6 +157,16 @@ StreamDomainSocket& StreamDomainSocket::swap(StreamDomainSocket& rhs) noexcept {
 
 Result<void, Error> StreamDomainSocket::connect(const NetworkEndpoint& endpoint) {
     return _pimpl->connect(endpoint.toString());
+}
+
+
+Result<void, Error> StreamDomainSocket::read(ByteBuffer& dest, size_type bytesToRead) {
+    return _pimpl->read(dest, bytesToRead);
+}
+
+
+Result<void, Error> StreamDomainSocket::write(ByteBuffer& src, size_type bytesToWrite) {
+    return _pimpl->write(src, bytesToWrite);
 }
 
 

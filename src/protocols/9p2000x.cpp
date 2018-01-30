@@ -27,33 +27,33 @@ const P9Protocol::Fid       P9Protocol::NOFID = static_cast<P9Protocol::Fid>(~0)
 
 
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(uint8* dest) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(uint8* dest) {
     _src.readLE(*dest);
     return *this;
 }
 
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(uint16* dest) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(uint16* dest) {
     _src.readLE(*dest);
     return *this;
 }
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(uint32* dest) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(uint32* dest) {
     _src.readLE(*dest);
     return *this;
 }
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(uint64* dest) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(uint64* dest) {
     _src.readLE(*dest);
     return *this;
 }
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(String* dest) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(String* dest) {
     uint16 dataSize = 0;
     _src.readLE(dataSize);
 
@@ -72,16 +72,16 @@ P9Protocol::P9Decoder::read(String* dest) {
     return *this;
 }
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(P9Protocol::Qid* qid) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(P9Protocol::Qid* qid) {
     return read(&qid->type)
             .read(&qid->version)
             .read(&qid->path);
 }
 
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(P9Protocol::Stat* stat) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(P9Protocol::Stat* stat) {
     return read(&stat->size)
             .read(&stat->type)
             .read(&stat->dev)
@@ -96,19 +96,21 @@ P9Protocol::P9Decoder::read(P9Protocol::Stat* stat) {
             .read(&(stat->muid));
 }
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(ImmutableMemoryView* data) {
-
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(ImmutableMemoryView* data) {
     P9Protocol::size_type dataSize = 0;
+    // Read size of the following data.
     read(&dataSize);
+
+    // Read the data. Note we only take a view into the actual message buffer.
     *data = _src.viewRemaining().slice(0, dataSize);
     _src.advance(dataSize);
 
     return (*this);
 }
 
-P9Protocol::P9Decoder&
-P9Protocol::P9Decoder::read(Path* path) {
+P9Protocol::Decoder&
+P9Protocol::Decoder::read(Path* path) {
     uint16 componentsCount = 0;
     read(&componentsCount);
 
@@ -130,7 +132,7 @@ P9Protocol::P9Decoder::read(Path* path) {
 
 
 Result<P9Protocol::Response, Error>
-parseNoDataResponse(const P9Protocol::MessageHeader& header, ByteBuffer& SOLACE_UNUSED(data)) {
+parseNoDataResponse(const P9Protocol::MessageHeader& header, ReadBuffer& SOLACE_UNUSED(data)) {
     P9Protocol::Response fcall(header.type, header.tag);
 
     return Ok(std::move(fcall));
@@ -138,10 +140,10 @@ parseNoDataResponse(const P9Protocol::MessageHeader& header, ByteBuffer& SOLACE_
 
 
 Result<P9Protocol::Response, Error>
-parseErrorResponse(const P9Protocol::MessageHeader& SOLACE_UNUSED(header), ByteBuffer& data) {
+parseErrorResponse(const P9Protocol::MessageHeader& SOLACE_UNUSED(header), ReadBuffer& data) {
     String errorMessage;
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&errorMessage);
 
     return Err(Error(errorMessage.c_str()));
@@ -149,10 +151,10 @@ parseErrorResponse(const P9Protocol::MessageHeader& SOLACE_UNUSED(header), ByteB
 
 
 Result<P9Protocol::Response, Error>
-parseVersionResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseVersionResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&fcall.version.msize)
             .read(&fcall.version.version);
 
@@ -161,10 +163,10 @@ parseVersionResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) 
 
 
 Result<P9Protocol::Response, Error>
-parseAuthResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseAuthResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&fcall.auth.qid);
 
     return Ok(std::move(fcall));
@@ -172,10 +174,10 @@ parseAuthResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-parseAttachResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseAttachResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&fcall.attach.qid);
 
     return Ok(std::move(fcall));
@@ -184,10 +186,10 @@ parseAttachResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-parseOpenResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseOpenResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&fcall.open.qid)
             .read(&fcall.open.iounit);
 
@@ -196,10 +198,10 @@ parseOpenResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-parseCreateResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseCreateResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&fcall.create.qid)
             .read(&fcall.open.iounit);
 
@@ -208,10 +210,10 @@ parseCreateResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-parseReadResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseReadResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&fcall.read.data);
 
     return Ok(std::move(fcall));
@@ -219,10 +221,10 @@ parseReadResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-parseWriteResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseWriteResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&fcall.write.count);
 
     return Ok(std::move(fcall));
@@ -230,11 +232,11 @@ parseWriteResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-parseStatResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseStatResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
     uint16 dummySize;
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&dummySize)
             .read(&fcall.stat);
 
@@ -243,10 +245,10 @@ parseStatResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Response, Error>
-parseWalkResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseWalkResponse(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Response fcall(header.type, header.tag);
 
-    P9Protocol::P9Decoder decoder(data);
+    P9Protocol::Decoder decoder(data);
 
     // FIXME: Non-sense!
     decoder.read(&fcall.walk.nqids);
@@ -264,11 +266,11 @@ parseWalkResponse(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Result<P9Protocol::Request, Error>
-parseVersionRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseVersionRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asVersion();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.msize)
             .read(&msg.version);
 
@@ -277,11 +279,11 @@ parseVersionRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseAuthRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseAuthRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asAuth();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.afid)
             .read(&msg.uname)
             .read(&msg.aname);
@@ -291,11 +293,11 @@ parseAuthRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseFlushRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseFlushRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asFlush();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.oldtag);
 
     return Ok(std::move(fcall));
@@ -303,11 +305,11 @@ parseFlushRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseAttachRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseAttachRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asAttach();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.afid)
             .read(&msg.uname)
@@ -318,11 +320,11 @@ parseAttachRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseWalkRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseWalkRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asWalk();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.newfid)
             .read(&msg.path);
@@ -333,12 +335,12 @@ parseWalkRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseOpenRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseOpenRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asOpen();
     byte openMode;
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&openMode);
 
@@ -349,12 +351,12 @@ parseOpenRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseCreateRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseCreateRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asCreate();
     byte openMode;
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.name)
             .read(&msg.perm)
@@ -367,11 +369,11 @@ parseCreateRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseReadRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseReadRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asRead();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.offset)
             .read(&msg.count);
@@ -381,11 +383,11 @@ parseReadRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseWriteRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseWriteRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asWrite();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.offset)
             .read(&msg.data);
@@ -395,11 +397,11 @@ parseWriteRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseClunkRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseClunkRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asClunk();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid);
 
     return Ok(std::move(fcall));
@@ -407,11 +409,11 @@ parseClunkRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseRemoveRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseRemoveRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asRemove();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid);
 
     return Ok(std::move(fcall));
@@ -419,11 +421,11 @@ parseRemoveRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseStatRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseStatRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asStat();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid);
 
     return Ok(std::move(fcall));
@@ -431,11 +433,11 @@ parseStatRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseWStatRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseWStatRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asWstat();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.stat);
 
@@ -445,11 +447,11 @@ parseWStatRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 
 
 Result<P9Protocol::Request, Error>
-parseSessionRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseSessionRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asSession();
-//    P9Protocol::P9Decoder(data);
+//    P9Protocol::Decoder(data);
 //            .read(&fcall.session.key);
 
     msg.key = data.viewRemaining().slice(0, 8);
@@ -459,11 +461,11 @@ parseSessionRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
 }
 
 Result<P9Protocol::Request, Error>
-parseShortReadRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseShortReadRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asShortRead();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.path);
 
@@ -471,11 +473,11 @@ parseShortReadRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data)
 }
 
 Result<P9Protocol::Request, Error>
-parseShortWriteRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data) {
+parseShortWriteRequest(const P9Protocol::MessageHeader& header, ReadBuffer& data) {
     P9Protocol::Request fcall(header.type, header.tag);
 
     auto& msg = fcall.asShortWrite();
-    P9Protocol::P9Decoder(data)
+    P9Protocol::Decoder(data)
             .read(&msg.fid)
             .read(&msg.path)
             .read(&msg.data);
@@ -486,7 +488,7 @@ parseShortWriteRequest(const P9Protocol::MessageHeader& header, ByteBuffer& data
 
 
 Result<P9Protocol::MessageHeader, Error>
-P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
+P9Protocol::parseMessageHeader(ReadBuffer& buffer) const {
 //    Solace::assertIndexInRange(buffer.viewWritten().size(), 0, headerSize());
     const auto mandatoryHeaderSize = headerSize();
     const auto dataAvailliable = buffer.remaining();
@@ -525,7 +527,7 @@ P9Protocol::parseMessageHeader(ByteBuffer& buffer) const {
 
 
 Result<P9Protocol::Response, Error>
-P9Protocol::parseResponse(const MessageHeader& header, ByteBuffer& data) const {
+P9Protocol::parseResponse(const MessageHeader& header, ReadBuffer& data) const {
     const auto expectedData = header.size - headerSize();
 
     // Message data sanity check
@@ -565,7 +567,7 @@ P9Protocol::parseResponse(const MessageHeader& header, ByteBuffer& data) const {
 }
 
 Result<P9Protocol::Request, Solace::Error>
-P9Protocol::parseRequest(const MessageHeader& header, ByteBuffer& data) const {
+P9Protocol::parseRequest(const MessageHeader& header, ReadBuffer& data) const {
     // Just paranoid about huge messages exciding frame size getting through.
     if (header.size > maxNegotiatedMessageSize())
         return Err(Error("Ill-formed message: Declared frame size greater than negotiated message size"));

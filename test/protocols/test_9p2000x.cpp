@@ -1109,7 +1109,8 @@ TEST_F(P9Messages, parseStatRespose) {
 
     encode9P(_buffer, stat);
     const auto totalSize = _buffer.position();
-    _buffer.reset(headPosition) << P9Protocol::size_type(totalSize);
+    _buffer.reset(headPosition);
+    _buffer << P9Protocol::size_type(totalSize);
     _buffer.reset(totalSize);
 
     auto headerResult = proc.parseMessageHeader(_buffer.flip());
@@ -1288,7 +1289,8 @@ TEST_F(P9Messages, parseWalkRespose) {
 
 
     const auto totalSize = _buffer.position();
-    _buffer.reset(headPosition) << P9Protocol::size_type(totalSize);
+    _buffer.reset(headPosition);
+    _buffer << P9Protocol::size_type(totalSize);
     _buffer.reset(totalSize);
 
     auto headerResult = proc.parseMessageHeader(_buffer.flip());

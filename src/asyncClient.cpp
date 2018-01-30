@@ -14,6 +14,12 @@ using namespace Solace;
 using namespace cadence;
 
 
+AsyncClient::TransactionalMemoryView::~TransactionalMemoryView() {
+    if (_txPool)
+        _txPool->releaseTransaction(_tag);
+}
+
+
 AsyncClient::TransactionPool::TransactionPool(size_t size, MemoryManager& memManger) {
     for (size_t i = 0; i < size; ++i) {
         _transactions.emplace_back(i, ByteBuffer(memManger.create(P9Protocol::MAX_MESSAGE_SIZE)));
@@ -113,7 +119,7 @@ AsyncClient::connect(const NetworkEndpoint& endpoint) {
                 .version();
 
         // Write it into the pipe
-        return sendRequest(tx)
+        return asyncSendRequest(tx)
                 .then([this, &tx](P9Protocol::Response&& response) {
                     _transactionPool.releaseTransaction(tx.tag);
 
@@ -128,7 +134,7 @@ AsyncClient::connect(const NetworkEndpoint& endpoint) {
 }
 */
 
-Future<void>
+Result<void, Error>
 AsyncClient::beginSession(const String& resource, const String& cred) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
@@ -138,6 +144,30 @@ AsyncClient::beginSession(const String& resource, const String& cred) {
 
     // Write it into the pipe
     return sendRequest(tx)
+            .then([this](P9Protocol::Response&& response) {
+                _resourceProtocol.maxNegotiatedMessageSize(response.version.msize);
+                // TODO(abbyssoul): Check if version is supported:
+                _resourceProtocol.setNegotiatedVersion(response.version.version);
+
+                // Now we should have the whole message
+                return;  // response.version.version;
+            })
+            .then([this, &resource, &cred]() {
+                return doAuth(resource, cred);
+            });
+}
+
+
+Future<void>
+AsyncClient::asyncBeginSession(const String& resource, const String& cred) {
+    // Prepare the version request
+    auto& tx = _transactionPool.allocateTransaction();
+
+    P9Protocol::RequestBuilder(tx.buffer)
+            .version();
+
+    // Write it into the pipe
+    return asyncSendRequest(tx)
             .then([this, &tx](P9Protocol::Response&& response) {
                 _transactionPool.releaseTransaction(tx.tag);
 
@@ -149,12 +179,12 @@ AsyncClient::beginSession(const String& resource, const String& cred) {
                 return;  // response.version.version;
             })
             .then([this, resource, cred]() {
-                return doAuth(resource, cred);
+                return doAsyncAuth(resource, cred);
             });
 }
 
 
-Future<void>
+Result<void, Error>
 AsyncClient::doAuth(const String& resource, const String& cred) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
@@ -166,10 +196,37 @@ AsyncClient::doAuth(const String& resource, const String& cred) {
 
     // Write it into the pipe
     return sendRequest(tx)
+            .then([this, &cred, &resource](P9Protocol::Response&& response) {
+                return doAuthDance(response.auth.qid, cred, resource);
+            })
+            .orElse([this](Error&&) -> Result<void, Error> {
+                releaseFid(_authFid);
+                _authFid = P9Protocol::NOFID;
+
+                return Ok();  // It's fine - probably not a real error. Just no authentication required!
+            })
+            .then([&cred, &resource, this]() {
+                return doAttachment(cred, resource);
+            });
+}
+
+
+Future<void>
+AsyncClient::doAsyncAuth(const String& resource, const String& cred) {
+    // Prepare the version request
+    auto& tx = _transactionPool.allocateTransaction();
+
+    _authFid = allocateFid();
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .auth(_authFid, cred, resource);
+
+    // Write it into the pipe
+    return asyncSendRequest(tx)
             .then([cred, resource, &tx, this](P9Protocol::Response&& response) {
                 _transactionPool.releaseTransaction(tx.tag);
 
-                return doAuthDance(response.auth.qid, cred, resource);
+                return doAsyncAuthDance(response.auth.qid, cred, resource);
             })
             .onError([this](Error&&) -> Result<void, Error> {
                 releaseFid(_authFid);
@@ -178,12 +235,12 @@ AsyncClient::doAuth(const String& resource, const String& cred) {
                 return Ok();  // It's fine - probably not a real error. Just no authentication required!
             })
             .then([cred, resource, this]() {
-                return doAttachment(cred, resource);
+                return doAsyncAttachment(cred, resource);
             });
 }
 
 
-Future<void>
+Result<void, Error>
 AsyncClient::doAuthDance(const P9Protocol::Qid& /*authQid*/, const String& userName, const String& /*rootName*/) {
     auto& tx = _transactionPool.allocateTransaction();
 
@@ -194,6 +251,23 @@ AsyncClient::doAuthDance(const P9Protocol::Qid& /*authQid*/, const String& userN
 
     // Write it into the pipe
     return sendRequest(tx)
+            .then([this, &tx](P9Protocol::Response&& /*response*/) {
+                // Probably should examine root Qid too.
+                return Ok();
+            });
+}
+
+Future<void>
+AsyncClient::doAsyncAuthDance(const P9Protocol::Qid& /*authQid*/, const String& userName, const String& /*rootName*/) {
+    auto& tx = _transactionPool.allocateTransaction();
+
+    String token = userName;  // FIXME: Do a better auth
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .write(_authFid, 0, token.view());
+
+    // Write it into the pipe
+    return asyncSendRequest(tx)
             .then([this, &tx](P9Protocol::Response&& /*response*/) -> Result<void, Error> {
                 _transactionPool.releaseTransaction(tx.tag);
 
@@ -203,7 +277,7 @@ AsyncClient::doAuthDance(const P9Protocol::Qid& /*authQid*/, const String& userN
 }
 
 
-Future<void>
+Result<void, Error>
 AsyncClient::doAttachment(const String& userName, const String& rootName) {
     auto& tx = _transactionPool.allocateTransaction();
 
@@ -215,6 +289,24 @@ AsyncClient::doAttachment(const String& userName, const String& rootName) {
 
     // Write it into the pipe
     return sendRequest(tx)
+            .then([&tx, this](P9Protocol::Response&& /*response*/) {
+                return Ok();
+            });
+}
+
+
+Future<void>
+AsyncClient::doAsyncAttachment(const String& userName, const String& rootName) {
+    auto& tx = _transactionPool.allocateTransaction();
+
+    _rootFid = allocateFid();
+    P9Protocol::RequestBuilder(tx.buffer)
+            .tag(tx.tag)
+            .attach(_rootFid, _authFid,
+                    userName, rootName);
+
+    // Write it into the pipe
+    return asyncSendRequest(tx)
             .then([&tx, this](P9Protocol::Response&& /*response*/) -> Result<void, Error> {
                 _transactionPool.releaseTransaction(tx.tag);
                 // Probably should examine root Qid too.
@@ -230,7 +322,7 @@ AsyncClient::open(P9Protocol::Fid fid, P9Protocol::OpenMode mode) {
             .tag(tx.tag)
             .open(fid, mode);
 
-    return sendRequest(tx)
+    return asyncSendRequest(tx)
             .then([this](P9Protocol::Response&& r) {
                 _transactionPool.releaseTransaction(r.tag);
 
@@ -238,7 +330,8 @@ AsyncClient::open(P9Protocol::Fid fid, P9Protocol::OpenMode mode) {
             });
 }
 
-Future<MemoryView>
+
+Future<AsyncClient::TransactionalMemoryView>
 AsyncClient::read(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type iounit) {
     auto& tx = _transactionPool.allocateTransaction();
 
@@ -252,15 +345,11 @@ AsyncClient::read(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type ioun
             .tag(tx.tag)
             .read(fid, offset, iounit);
 
-    return sendRequest(tx)
+    return asyncSendRequest(tx)
             .then([this] (P9Protocol::Response&& response) {
-                auto& data = response.read.data;
-                MemoryView buffer(_memoryManage->create(data.size()));
-                buffer.write(data);
-
-                _transactionPool.releaseTransaction(response.tag);
-
-                return buffer;
+                return TransactionalMemoryView(response.tag,
+                                               std::move(response.read.data),
+                                               &_transactionPool);
             });
 }
 
@@ -273,7 +362,7 @@ AsyncClient::write(P9Protocol::Fid fid, const Solace::ImmutableMemoryView& data)
             .tag(tx.tag)
             .write(fid, 0, data);
 
-    return sendRequest(tx)
+    return asyncSendRequest(tx)
             .then([this] (P9Protocol::Response&& response) {
                 _transactionPool.releaseTransaction(response.tag);
 
@@ -291,14 +380,14 @@ AsyncClient::clunk(P9Protocol::Fid fid) {
 
     releaseFid(fid);
 
-    return sendRequest(tx)
+    return asyncSendRequest(tx)
             .then([this](P9Protocol::Response&& resp) {
                 _transactionPool.releaseTransaction(resp.tag);
             });
 }
 
 
-Future<MemoryView>
+Future<AsyncClient::TransactionalMemoryView>
 AsyncClient::read(const Path& path) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
@@ -309,7 +398,7 @@ AsyncClient::read(const Path& path) {
             .walk(_rootFid, fid, path);
 
     // Write it into the pipe
-    return sendRequest(tx)
+    return asyncSendRequest(tx)
             .then([fid, this] (P9Protocol::Response&& r) {
                 _transactionPool.releaseTransaction(r.tag);
 
@@ -317,10 +406,10 @@ AsyncClient::read(const Path& path) {
             }).then([fid, this] (P9Protocol::size_type iounit) {
                 return read(fid, 0, iounit);
             })
-            .then([this, fid] (MemoryView&& data) -> Result<MemoryView, Error> {
+            .then([this, fid] (TransactionalMemoryView&& txData) -> Result<TransactionalMemoryView, Error> {
                 clunk(fid);
 
-                return Ok(std::move(data));
+                return Ok(std::move(txData));
             });
 }
 
@@ -336,7 +425,7 @@ AsyncClient::write(const Path& path, const Solace::ImmutableMemoryView& data) {
             .walk(_rootFid, fid, path);
 
     // Write it into the pipe
-    return sendRequest(tx)
+    return asyncSendRequest(tx)
             .then([fid, this] (P9Protocol::Response&& r) {
                 _transactionPool.releaseTransaction(r.tag);
 
@@ -353,11 +442,12 @@ AsyncClient::write(const Path& path, const Solace::ImmutableMemoryView& data) {
 Future<Array<Path>>
 AsyncClient::readDir(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type iounit, std::vector<Path>&& lst) {
     return read(fid, offset, iounit)
-            .then([this, fid, iounit, offset, l = std::move(lst)](MemoryView&& data) mutable {
-                const auto dataSize = data.size();
+            .then([this, fid, iounit, offset, l = std::move(lst)](TransactionalMemoryView&& txData) mutable {
+                const auto dataSize = txData.data.size();
                 if (dataSize > 0) {
-                    ByteBuffer b(std::move(data));
-                    P9Protocol::P9Decoder decoder(b);
+                    ReadBuffer b(std::move(txData.data));
+                    P9Protocol::Decoder decoder(b);
+
                     while (b.hasRemaining()) {
                         P9Protocol::Stat stat;
                         decoder.read(&stat);
@@ -385,7 +475,7 @@ AsyncClient::list(const Path& path) {
             .walk(_rootFid, fid, path);
 
     // Write it into the pipe
-    return sendRequest(tx)
+    return asyncSendRequest(tx)
             .then([fid, this] (P9Protocol::Response&& r) {
                 _transactionPool.releaseTransaction(r.tag);
 
@@ -404,7 +494,7 @@ AsyncClient::list(const Path& path) {
 
 
 Future<P9Protocol::Response>
-AsyncClient::sendRequest(Transaction& tx) {
+AsyncClient::asyncSendRequest(Transaction& tx) {
     return _socket->asyncWrite(tx.buffer.flip())
                 .then([&tx, this] () {
                     // When that's done - expect a response of a header size:
@@ -438,4 +528,31 @@ AsyncClient::sendRequest(Transaction& tx) {
                                 return Err(std::move(e));
                             });
                 });
+}
+
+
+Result<P9Protocol::Response, Error>
+AsyncClient::sendRequest(Transaction& tx) {
+
+    auto result = _socket->write(tx.buffer.flip())
+            .then([this, &tx]() {
+                // When we done sending data, expect a response of at least of a header size:
+                _socket->read(tx.buffer.clear(), _resourceProtocol.headerSize());
+            })
+            .then([this, &tx]() {  // We better parse that message header to figure out the size of the whole message
+                return _resourceProtocol.parseMessageHeader(tx.buffer.flip());
+            })
+            .then([this, &tx] (P9Protocol::MessageHeader&& header){
+                const auto payloadSize = header.size - _resourceProtocol.headerSize();
+
+                // Read the message payload
+                return _socket->read(tx.buffer.clear(), payloadSize)
+                        .then([this, &tx, &header]() {
+                            return _resourceProtocol.parseResponse(header, tx.buffer.flip());
+                        });
+            });
+
+    _transactionPool.releaseTransaction(tx.tag);
+
+    return result;
 }

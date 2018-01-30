@@ -110,6 +110,51 @@ public:
      */
     virtual Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) = 0;
 
+    /**
+     * Read request synchroniously from this IO object into the given buffer.
+     * This method reads the data until the provided destination buffer is full.
+     *
+     * @param dest The provided destination buffer to read data into.
+     * @return A operation result or an error.
+     */
+    Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest) {
+        return read(dest, dest.remaining());
+    }
+
+    /**
+     * Read request synchroniously from this IO object into the given buffer.
+     * This method reads the data until the provided destination buffer is full.
+     *
+     * @param dest The provided destination buffer to read data into.
+     * @param bytesToRead Amount of data (in bytes) to read from this IO object.
+     * @return A operation result or an error.
+     *
+     * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
+     */
+    virtual Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) = 0;
+
+    /**
+     * Post an async write request to write specified amount of data into this IO object.
+     * This method writes whole content of the provided buffer into the IO objec.
+     *
+     * @param src The provided source buffer to read data from.
+     * @return A operation result or an error.
+     */
+    Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src) {
+        return write(src, src.remaining());
+    }
+
+    /**
+     * Post an async write request to write specified amount of data into this IO object.
+     *
+     * @param src The provided source buffer to read data from.
+     * @param bytesToWrite Amount of data (in bytes) to write from the buffer into this IO object.
+     * @return A operation result or an error.
+     *
+     * @note If the provided source buffer does not have requested amount of data - an exception is raised.
+     */
+    virtual Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src, size_type bytesToWrite) = 0;
+
 
 private:
 

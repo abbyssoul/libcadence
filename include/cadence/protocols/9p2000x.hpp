@@ -11,8 +11,9 @@
 #define CADENCE_PROTOCOLS_9P2000X_HPP
 
 #include <solace/string.hpp>
+#include <solace/readBuffer.hpp>
 #include <solace/byteBuffer.hpp>
-#include <solace/version.hpp>
+
 #include <solace/result.hpp>
 #include <solace/error.hpp>
 #include <solace/path.hpp>
@@ -184,25 +185,25 @@ public:
 
 
 
-    class P9Decoder {
+    class Decoder {
     public:
 
-        P9Decoder(Solace::ByteBuffer& src) :
+        Decoder(Solace::ReadBuffer& src) :
             _src(src)
         {}
 
-        P9Decoder& read(Solace::uint8* dest);
-        P9Decoder& read(Solace::uint16* dest);
-        P9Decoder& read(Solace::uint32* dest);
-        P9Decoder& read(Solace::uint64* dest);
-        P9Decoder& read(Solace::String* dest);
-        P9Decoder& read(Qid* qid);
-        P9Decoder& read(Stat* stat);
-        P9Decoder& read(Solace::ImmutableMemoryView* data);
-        P9Decoder& read(Solace::Path* path);
+        Decoder& read(Solace::uint8* dest);
+        Decoder& read(Solace::uint16* dest);
+        Decoder& read(Solace::uint32* dest);
+        Decoder& read(Solace::uint64* dest);
+        Decoder& read(Solace::String* dest);
+        Decoder& read(Qid* qid);
+        Decoder& read(Stat* stat);
+        Decoder& read(Solace::ImmutableMemoryView* data);
+        Decoder& read(Solace::Path* path);
 
     private:
-        Solace::ByteBuffer& _src;
+        Solace::ReadBuffer& _src;
     };
 
 
@@ -421,6 +422,7 @@ public:
 
         RequestBuilder(Solace::ByteBuffer& dest) :
             _tag(1),
+            _payloadSize(0),
             _buffer(dest)
         {}
 
@@ -442,6 +444,7 @@ public:
 
         Tag tag() const { return _tag; }
         MessageType type() const { return _type; }
+        size_type payloadSize() const noexcept { return _payloadSize; }
 
         /**
          * Create a version request.
@@ -476,6 +479,8 @@ public:
     private:
         Tag                     _tag;
         MessageType             _type;
+        size_type               _payloadSize;
+
         Solace::ByteBuffer&     _buffer;
     };
 
@@ -552,27 +557,35 @@ public:
 
         ResponseBuilder(Solace::ByteBuffer& dest) :
             _tag(1),
+            _type(),
+            _payloadSize(0),
+            _initialPosition(dest.position()),
             _buffer(dest)
         {}
 
-        Solace::ByteBuffer& buffer() {
+        Solace::ByteBuffer& buffer() noexcept {
             return _buffer;
         }
 
-        Solace::ByteBuffer& build();
+        Solace::ByteBuffer& build(bool recalcPayloadSize = false);
 
         /**
          * Set response message tag
          * @param value Tag of the response message.
          * @return Ref to this for a fluent interface.
          */
-        ResponseBuilder& tag(Tag value) {
+        ResponseBuilder& tag(Tag value) noexcept {
             _tag = value;
             return (*this);
         }
 
-        Tag tag() const { return _tag; }
-        MessageType type() const { return _type; }
+        Tag tag() const noexcept { return _tag; }
+        MessageType type() const noexcept { return _type; }
+        size_type payloadSize() const noexcept { return _payloadSize; }
+
+        ResponseBuilder& updatePayloadSize();
+        ResponseBuilder& updatePayloadSize(size_type payloadSize);
+
 
         ResponseBuilder& version(const Solace::String& version, size_type maxMessageSize = MAX_MESSAGE_SIZE);
         ResponseBuilder& auth(const Qid& qid);
@@ -601,7 +614,10 @@ public:
     private:
         Tag                     _tag;
         MessageType             _type;
-        Solace::ByteBuffer&     _buffer;
+        size_type               _payloadSize;
+
+        Solace::ByteBuffer::size_type   _initialPosition;
+        Solace::ByteBuffer&             _buffer;
     };
 
 
@@ -647,13 +663,13 @@ public:
     //---------------------------------------------------------
 
     Solace::Result<MessageHeader, Solace::Error>
-    parseMessageHeader(Solace::ByteBuffer& buffer) const;
+    parseMessageHeader(Solace::ReadBuffer& buffer) const;
 
     Solace::Result<Response, Solace::Error>
-    parseResponse(const MessageHeader& header, Solace::ByteBuffer& data) const;
+    parseResponse(const MessageHeader& header, Solace::ReadBuffer& data) const;
 
     Solace::Result<Request, Solace::Error>
-    parseRequest(const MessageHeader& header, Solace::ByteBuffer& data) const;
+    parseRequest(const MessageHeader& header, Solace::ReadBuffer& data) const;
 
 private:
 

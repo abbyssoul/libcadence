@@ -74,6 +74,12 @@ public:
     Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
 
 
+    /** @see Channel::read */
+    Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+
+    /** @see Channel::write */
+    Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+
 private:
 
     class SerialImpl;

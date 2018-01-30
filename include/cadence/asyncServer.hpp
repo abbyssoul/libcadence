@@ -21,83 +21,17 @@
 #include "async/eventloop.hpp"
 #include "async/tcpsocket.hpp"
 #include "ipendpoint.hpp"
+#include "serviceNodes.hpp"
 
 #include <solace/path.hpp>
 
-#include <map>
 
 namespace cadence {
 
+/**
+ * Asynchronious data server that server serviceNodes via resource protocol.
+ */
 class AsyncServer {
-public:
-
-    /**
-     * Base class for Nodes served by the server.
-     * Node is an element of the hierarchy. It can be a resource such as file or a directory.
-     * Files can be a data blobs such as files of a disk or synthetic resources (like proc fs)
-     */
-    class Node {
-    public:
-        virtual ~Node();
-
-        virtual Solace::Result<void, Solace::Error>
-        mount(const Solace::String& pathSegment, std::unique_ptr<Node>&& node) = 0;
-
-        virtual Solace::Result<std::shared_ptr<Node>, Solace::Error>
-        walk(const Solace::String& pathSegment);
-
-        virtual bool isWalkable() const noexcept {
-            return false;
-        }
-
-        virtual Solace::uint32 getVersion() const noexcept {
-            return 0;
-        }
-
-        virtual Solace::Result<void, Solace::Error>
-        open(const Solace::String& uname, Solace::byte mode) = 0;
-
-        virtual Solace::Result<void, Solace::Error>
-        getStats() = 0;
-
-        virtual Solace::Result<void, Solace::Error>
-        read(Solace::uint32 count, Solace::uint64 offset, Solace::ByteBuffer& buffer) = 0;
-
-        virtual Solace::Result<void, Solace::Error>
-        write(Solace::ImmutableMemoryView data, Solace::uint64 offset) = 0;
-    };
-
-
-    class DirectoryNode : public Node {
-    public:
-
-        Solace::Result<void, Solace::Error>
-        mount(const Solace::String& pathSegment, std::unique_ptr<Node>&& node) override;
-
-        Solace::Result<std::shared_ptr<Node>, Solace::Error>
-        walk(const Solace::String& pathSegment) override;
-
-        bool isWalkable() const noexcept override {
-            return true;
-        }
-
-        Solace::Result<void, Solace::Error>
-        open(const Solace::String& uname, Solace::byte mode) override;
-
-        Solace::Result<void, Solace::Error>
-        getStats() override;
-
-        Solace::Result<void, Solace::Error>
-        read(Solace::uint32 count, Solace::uint64 offset, Solace::ByteBuffer& buffer) override;
-
-        Solace::Result<void, Solace::Error>
-        write(Solace::ImmutableMemoryView data, Solace::uint64 offset) override;
-
-    private:
-
-        std::map<Solace::String, std::shared_ptr<Node>> _mounts;
-    };
-
 public:
 
     AsyncServer(async::EventLoop& eventLoop, Solace::MemoryManager& memManager);
@@ -107,7 +41,7 @@ public:
     Solace::Result<void, Solace::Error> startListen(const IPEndpoint& endpoint);
     void stop();
 
-    Solace::Result<void, Solace::Error> mount(Solace::Path& path, std::unique_ptr<Node>&& r);
+    Solace::Result<void, Solace::Error> mount(const Solace::Path& path, std::shared_ptr<Node>&& r);
 
 protected:
 
@@ -118,6 +52,7 @@ protected:
 
 private:
 
+    /// Memory manager used to allocate memory for new sessions.
     Solace::MemoryManager&          _memManager;
 
     async::TcpAcceptor     _acceptor;

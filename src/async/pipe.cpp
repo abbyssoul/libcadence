@@ -81,6 +81,33 @@ public:
     }
 
 
+    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+        asio::error_code ec;
+
+        const auto len = asio::read(_in, asio_buffer(dest, bytesToRead), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            dest.advance(len);
+        }
+
+        return Ok();
+    }
+
+    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+        asio::error_code ec;
+
+        const auto len = asio::write(_out, asio_buffer(src, bytesToWrite), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            src.advance(len);
+        }
+
+        return Ok();
+    }
+
+
 private:
     asio::posix::stream_descriptor _in;
     asio::posix::stream_descriptor _out;
@@ -120,4 +147,14 @@ Future<void> Pipe::asyncRead(ByteBuffer& dest, size_type bytesToRead) {
 
 Future<void> Pipe::asyncWrite(ByteBuffer& src, size_type bytesToWrite) {
     return _pimpl->asyncWrite(src, bytesToWrite);
+}
+
+
+Result<void, Error> Pipe::read(ByteBuffer& dest, size_type bytesToRead) {
+    return _pimpl->read(dest, bytesToRead);
+}
+
+
+Result<void, Error> Pipe::write(ByteBuffer& src, size_type bytesToWrite) {
+    return _pimpl->write(src, bytesToWrite);
 }

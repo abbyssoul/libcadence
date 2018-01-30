@@ -95,6 +95,32 @@ public:
         return Ok();
     }
 
+    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+        asio::error_code ec;
+
+        const auto len = asio::read(_socket, asio_buffer(dest, bytesToRead), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            dest.advance(len);
+        }
+
+        return Ok();
+    }
+
+    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+        asio::error_code ec;
+
+        const auto len = asio::write(_socket, asio_buffer(src, bytesToWrite), ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            src.advance(len);
+        }
+
+        return Ok();
+    }
+
 
     void cancel() {
         _socket.cancel();
@@ -367,6 +393,14 @@ void TcpSocket::close() {
 
 Result<void, Error> TcpSocket::connect(const NetworkEndpoint& endpoint) {
     return _pimpl->connect(*static_cast<const IPEndpoint*>(&endpoint));
+}
+
+Result<void, Error> TcpSocket::read(ByteBuffer& dest, size_type bytesToRead) {
+    return _pimpl->read(dest, bytesToRead);
+}
+
+Result<void, Error> TcpSocket::write(ByteBuffer& src, size_type bytesToWrite) {
+    return _pimpl->write(src, bytesToWrite);
 }
 
 

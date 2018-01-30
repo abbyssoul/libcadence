@@ -9,14 +9,17 @@
 
 #include <cadence/asyncServer.hpp>
 #include <cadence/ipendpoint.hpp>
+#include <cadence/unixDomainEndpoint.hpp>
 #include <cadence/async/tcpsocket.hpp>
 #include <cadence/version.hpp>
 
 #include <solace/memoryManager.hpp>
+#include <solace/uuid.hpp>
 #include <solace/framework/commandlineParser.hpp>
 
 
 #include <iostream>
+
 
 using namespace Solace;
 using namespace Solace::Framework;
@@ -33,7 +36,7 @@ int main(int argc, const char **argv) {
                             CommandlineParser::printHelp(),
                             CommandlineParser::printVersion("async_clent", cadence::getBuildVersion()),
                             {'p', "port", "Server port", &serverPort},
-                            {'h', "host", "Resource server endpoint", &serverEndpoint}})
+                            {'h', "host", "Server listen address", &serverEndpoint}})
             .parse(argc, argv);
 
     if (!res) {
@@ -50,15 +53,40 @@ int main(int argc, const char **argv) {
         }
     }
 
-    IPEndpoint ipEndpoint(serverEndpoint, serverPort);
     MemoryManager memManager(3 * 8*1024);
     EventLoop iocontext;
 
     AsyncServer server(iocontext, memManager);
-    server.startListen(ipEndpoint).
-            orElse([](Error&& e) {
-                std::cerr << e << std::endl;
-            });
+
+    char simpleMessage[] = "Hello data!\n";
+    ByteBuffer dataBuffer(memManager.create(128));
+
+    auto regionId = UUID::random();
+    dataBuffer << regionId;
+    dataBuffer << Solace::MemoryView::size_type(32);
+
+    auto region2 = UUID::random();
+
+    server.mount(Path("simple"), std::make_shared<DataNode>(wrapMemory(simpleMessage)));
+    server.mount(Path("regions"), std::make_shared<DirectoryNode>());
+    server.mount(Path({"regions", "test1"}), std::make_shared<DataNode>(dataBuffer.viewWritten()));
+    server.mount(Path({"regions", region2.toString()}), std::make_shared<DataNode>(region2.view()));
+
+    /*
+    if (serverEndpoint.startsWith('/')) {
+        UnixEndpoint endpoint(serverEndpoint);
+        server.startListen(endpoint).
+                orElse([](Error&& e) {
+                    std::cerr << e << std::endl;
+                });
+    } else  */
+    {
+        IPEndpoint ipEndpoint(serverEndpoint, serverPort);
+        server.startListen(ipEndpoint).
+                orElse([](Error&& e) {
+                    std::cerr << e << std::endl;
+                });
+    }
 
     // Run event loop
     iocontext.run();

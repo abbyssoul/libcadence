@@ -89,6 +89,12 @@ public:
      */
     Solace::Result<void, Solace::Error> connect(const NetworkEndpoint& endpoint) override;
 
+    /** @see Channel::read */
+    Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+
+    /** @see Channel::write */
+    Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+
     /**
      * Determine whether the socket is open.
      * @return True if socket is opened.

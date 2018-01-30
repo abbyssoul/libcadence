@@ -17,19 +17,48 @@
 #ifndef CADENCE_ASYNCCLIENT_HPP
 #define CADENCE_ASYNCCLIENT_HPP
 
+#include "networkEndpoint.hpp"
+
 #include "async/eventloop.hpp"
 #include "async/streamsocket.hpp"
-#include "protocols/9p2000x.hpp"
 
-#include "networkEndpoint.hpp"
+#include "protocols/9p2000x.hpp"
 
 
 namespace cadence {
 
 
 class AsyncClient {
+protected:
+    class TransactionPool;
+
 public:
     typedef P9Protocol::Tag TransactionId;
+
+    struct TransactionalMemoryView {
+
+        ~TransactionalMemoryView();
+
+        TransactionalMemoryView(TransactionId txId, Solace::ImmutableMemoryView&& mem, TransactionPool* pool) :
+            data(std::move(mem)),
+            _tag(txId),
+            _txPool(pool)
+        {}
+
+        TransactionalMemoryView(TransactionalMemoryView&& other) :
+            data(std::move(other.data)),
+            _tag(std::move(other._tag)),
+            _txPool(other._txPool)
+        {
+            other._txPool = nullptr;
+        }
+
+        Solace::ImmutableMemoryView data;
+
+    protected:
+        TransactionId       _tag;
+        TransactionPool*    _txPool;
+    };
 
 public:
 
@@ -66,14 +95,22 @@ public:
      * Establish a new session with the resource server.
      * @return Future of an established session, or an error.
      */
-    Solace::Future<void> beginSession(const Solace::String& resource, const Solace::String& cred);
+    Solace::Result<void, Solace::Error>
+    beginSession(const Solace::String& resource, const Solace::String& cred);
+
+    /**
+     * Establish a new session with the resource server.
+     * @return Future of an established session, or an error.
+     */
+    Solace::Future<void>
+    asyncBeginSession(const Solace::String& resource, const Solace::String& cred);
 
     /**
      * Read data given resource / key.
      * @param path A resource name / key to read data from.
      * @return Future data if the read succeed, an error otherwise.
      */
-    Solace::Future<Solace::MemoryView>
+    Solace::Future<TransactionalMemoryView>
     read(const Solace::Path& path);
 
     /**
@@ -96,9 +133,6 @@ public:
 
 protected:
 
-    P9Protocol::Fid allocateFid();
-    void releaseFid(P9Protocol::Fid fid);
-
     struct Transaction {
         const TransactionId tag;
         bool awaited;
@@ -112,7 +146,28 @@ protected:
         {}
     };
 
+    class TransactionPool {
+    public:
+        TransactionPool(size_t size, Solace::MemoryManager& memManger);
+        Transaction& lookup(TransactionId id);
+        Transaction& allocateTransaction();
+        void releaseTransaction(TransactionId tx);
+
+    private:
+        std::vector<Transaction>  _transactions;
+    };
+
+
+protected:
+
+    P9Protocol::Fid allocateFid();
+    void releaseFid(P9Protocol::Fid fid);
+
+
     Solace::Future<P9Protocol::Response>
+    asyncSendRequest(Transaction& tx);
+
+    Solace::Result<P9Protocol::Response, Solace::Error>
     sendRequest(Transaction& tx);
 
 
@@ -122,20 +177,37 @@ protected:
      * @param cred Creadential to assess resource access authorisation.
      * @return Future of the authorisation procedure.
      */
-    Solace::Future<void> doAuth(const Solace::String& resource, const Solace::String& cred);
+    Solace::Result<void, Solace::Error> doAuth(const Solace::String& resource, const Solace::String& cred);
 
-    Solace::Future<void>
+    Solace::Result<void, Solace::Error>
     doAuthDance(const P9Protocol::Qid& authQid,
                 const Solace::String& userName,
                 const Solace::String& rootName);
 
-    Solace::Future<void>
+    Solace::Result<void, Solace::Error>
     doAttachment(const Solace::String& userName, const Solace::String& rootName);
+
+
+    /**
+     * Authorise to the specific resource with provided credentials.
+     * @param resource Resource to request authorisation to.
+     * @param cred Creadential to assess resource access authorisation.
+     * @return Future of the authorisation procedure.
+     */
+    Solace::Future<void> doAsyncAuth(const Solace::String& resource, const Solace::String& cred);
+
+    Solace::Future<void>
+    doAsyncAuthDance(const P9Protocol::Qid& authQid,
+                const Solace::String& userName,
+                const Solace::String& rootName);
+
+    Solace::Future<void>
+    doAsyncAttachment(const Solace::String& userName, const Solace::String& rootName);
 
     Solace::Future<P9Protocol::size_type>
     open(P9Protocol::Fid fid, P9Protocol::OpenMode mode);
 
-    Solace::Future<Solace::MemoryView>
+    Solace::Future<TransactionalMemoryView>
     read(P9Protocol::Fid fid, Solace::uint64 offset, P9Protocol::size_type iounit = 0);
 
     Solace::Future<P9Protocol::size_type>
@@ -148,18 +220,6 @@ protected:
     readDir(P9Protocol::Fid fid, Solace::uint64 offset, P9Protocol::size_type iounit, std::vector<Solace::Path>&& list);
 
 private:
-
-
-    class TransactionPool {
-    public:
-        TransactionPool(size_t size, Solace::MemoryManager& memManger);
-        Transaction& lookup(TransactionId id);
-        Transaction& allocateTransaction();
-        void releaseTransaction(TransactionId tx);
-
-    private:
-        std::vector<Transaction>  _transactions;
-    };
 
     Solace::MemoryManager*              _memoryManage;
     std::unique_ptr<async::Channel>     _socket;                //!< Communication socket

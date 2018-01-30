@@ -70,7 +70,7 @@ std::ostream& operator<< (std::ostream& ostr, P9Protocol::MessageType t) {
 }
 
 
-P9Protocol::Qid nodeToQid(std::shared_ptr<AsyncServer::Node> node) {
+P9Protocol::Qid nodeToQid(std::shared_ptr<Node> node) {
     P9Protocol::Qid qid;
     qid.type = node->isWalkable()
             ? static_cast<byte>(P9Protocol::QidType::DIR)
@@ -83,7 +83,7 @@ P9Protocol::Qid nodeToQid(std::shared_ptr<AsyncServer::Node> node) {
 }
 
 
-P9Protocol::Stat nodeStats(const String& name, const std::shared_ptr<AsyncServer::Node>& node) {
+P9Protocol::Stat nodeStats(const String& name, const std::shared_ptr<Node>& node) {
     ByteBuffer emptyBuffer;
     P9Protocol::Encoder encoder(emptyBuffer);
 
@@ -101,9 +101,26 @@ P9Protocol::Stat nodeStats(const String& name, const std::shared_ptr<AsyncServer
 
 
 
-Result<std::shared_ptr<AsyncServer::Node>, Error>
-walk(const std::shared_ptr<AsyncServer::DirectoryNode>& root, const Path& path, Array<P9Protocol::Qid>& qids) {
-    std::shared_ptr<AsyncServer::Node> node(root);
+Result<std::shared_ptr<Node>, Error>
+walk(const std::shared_ptr<DirectoryNode>& root, const Path& path) {
+    std::shared_ptr<Node> node(root);
+
+    for (const auto& pathComponent : path) {
+        auto walkResult = node->walk(pathComponent);
+
+        if (walkResult) {
+            node = walkResult.unwrap();
+        } else {
+            return Err(walkResult.moveError());
+        }
+    }
+
+    return Ok(std::move(node));
+}
+
+Result<std::shared_ptr<Node>, Error>
+walk(const std::shared_ptr<DirectoryNode>& root, const Path& path, Array<P9Protocol::Qid>& qids) {
+    std::shared_ptr<Node> node(root);
 
     Array<P9Protocol::Qid>::size_type i = 0;
     for (const auto& pathComponent : path) {
@@ -111,7 +128,7 @@ walk(const std::shared_ptr<AsyncServer::DirectoryNode>& root, const Path& path, 
 
         if (walkResult) {
             node = walkResult.unwrap();
-            qids[i] = nodeToQid(node);
+            qids[i++] = nodeToQid(node);
         } else {
             return Err(walkResult.moveError());
         }
@@ -128,13 +145,22 @@ class AsyncServer::Session :
 public:
 
     ~Session() {
-        std::cout << "Session from " << _socket.getRemoteEndpoint().toString() << " destroyed." << std::endl;
+        std::cout << "Session from " << _remoteEndpoint.toString() << " destroyed." << std::endl;
+
+        // Close outstanding files:
+        std::cout << "Closing outstanding nodes: ";
+        for (auto& node : _openedNodes) {
+            std::cout << '\''<< node.first << '\'' << ' ';
+
+            closeNode(node.second);
+        }
+        std::cout << std::endl;
     }
 
-    Session(DirectoryNode& serverRoot, TcpSocket&& socket, ByteBuffer&& buffer, ByteBuffer&& readbuf) :
+    Session(DirectoryNode& serverRoot, TcpSocket&& socket, ByteBuffer&& buffer) :
         _socket(std::move(socket)),
+        _remoteEndpoint(_socket.getRemoteEndpoint()),
         _buffer(std::move(buffer)),
-        _readBuffer(std::move(readbuf)),
         _serverRoot(serverRoot)
     {
     }
@@ -143,7 +169,7 @@ public:
         doRead();
     }
 
-private:
+protected:
 
     void onVersionRequest(const P9Protocol::Request::Version& req, P9Protocol::ResponseBuilder& responseBuilder) {
         const auto minMessageSize = std::min(_protocol.maxNegotiatedMessageSize(), req.msize);
@@ -171,18 +197,16 @@ private:
     }
 
     void onAttachRequest(const P9Protocol::Request::Attach& req, P9Protocol::ResponseBuilder& responseBuilder) {
-        std::shared_ptr<AsyncServer::Node> attachementPoint;
+        std::shared_ptr<DirectoryNode> attachementPoint(&_serverRoot, [](DirectoryNode*){});
 
-        if (req.aname.empty()) {
-            attachementPoint.reset(&_serverRoot, [](AsyncServer::DirectoryNode*){});
-        } else {
-            auto res = _serverRoot.walk(req.aname);
+        if (!req.aname.empty()) {
+            auto res = walk(attachementPoint, Path::parse(req.aname)); //_serverRoot.walk(req.aname);
 
             if (res) {
                 auto attNode = res.unwrap();
 
                 if (attNode->isWalkable()) {
-                    attachementPoint = std::static_pointer_cast<AsyncServer::DirectoryNode>(attNode);
+                    attachementPoint = std::static_pointer_cast<DirectoryNode>(attNode);
                 } else {
                     responseBuilder.error("File not found");
 
@@ -195,7 +219,7 @@ private:
             }
         }
 
-        P9Protocol::Qid qid = nodeToQid(attachementPoint);
+        auto qid = nodeToQid(attachementPoint);
 
         _openedNodes.emplace(req.fid, std::move(attachementPoint));
 
@@ -215,7 +239,7 @@ private:
             return;
         }
 
-        auto rootDir = std::static_pointer_cast<AsyncServer::DirectoryNode>(attachmentIt->second);
+        auto rootDir = std::static_pointer_cast<DirectoryNode>(attachmentIt->second);
         // FIXME: Protection from a user supplied path length
         Array<P9Protocol::Qid> qids(req.path.getComponentsCount());
         auto walkResult = walk(rootDir, req.path, qids);
@@ -236,14 +260,13 @@ private:
             return;
         }
 
-        _readBuffer.clear();
-        auto readResult = nodeIt->second->open(_uname, static_cast<byte>(req.mode));
-        if (readResult) {
-            P9Protocol::Qid qid = nodeToQid(nodeIt->second);
+        auto openResult = nodeIt->second->open(_uname, static_cast<byte>(req.mode));
+        if (openResult) {
+            const P9Protocol::Qid qid = nodeToQid(nodeIt->second);
 
             responseBuilder.open(qid, 0);
         } else {
-            responseBuilder.error(readResult.getError());
+            responseBuilder.error(openResult.getError());
         }
     }
 
@@ -254,12 +277,7 @@ private:
             return;
         }
 
-        auto readResult = nodeIt->second->getStats();
-        if (readResult) {
-            responseBuilder.stat(nodeStats(kThisDir, nodeIt->second));
-        } else {
-            responseBuilder.error(readResult.getError());
-        }
+        responseBuilder.stat(nodeStats(kThisDir, nodeIt->second));
     }
 
     void onReadRequest(const P9Protocol::Request::Read& req, P9Protocol::ResponseBuilder& responseBuilder) {
@@ -269,12 +287,16 @@ private:
             return;
         }
 
-        _readBuffer.clear();
-        auto readResult = nodeIt->second->read(req.count, req.offset, _readBuffer);
-        if (readResult)
-            responseBuilder.read(_readBuffer.viewWritten());
-        else
+        ImmutableMemoryView empty;
+        responseBuilder.read(empty);
+
+        ByteBuffer writer(responseBuilder.buffer().viewRemaining());
+        auto readResult = nodeIt->second->read(req.count, req.offset, writer);
+        if (readResult) {
+            responseBuilder.read(writer.viewWritten());
+        } else {
             responseBuilder.error(readResult.getError());
+        }
     }
 
 
@@ -290,6 +312,8 @@ private:
             return;
         }
 
+        closeNode(nodeIt->second);
+
         _openedNodes.erase(nodeIt);
         responseBuilder.clunk();
     }
@@ -302,17 +326,24 @@ private:
         responseBuilder.tag(req.tag());
 
         switch (req.type()) {
-        case P9Protocol::MessageType::TVersion:     onVersionRequest(req.asVersion(), responseBuilder); break;
-        case P9Protocol::MessageType::TAuth:        onAuthRequest(req.asAuth(), responseBuilder); break;
-        case P9Protocol::MessageType::TAttach:      onAttachRequest(req.asAttach(), responseBuilder); break;
-        case P9Protocol::MessageType::TClunk:       onClankRequest(req.asClunk(), responseBuilder); break;
-        case P9Protocol::MessageType::TOpen:        onOpenRequest(req.asOpen(), responseBuilder); break;
-//        case P9Protocol::MessageType::TCreate:        onCreateRequest(req.asCreate(), responseBuilder); break;
-        case P9Protocol::MessageType::TFlush:       onFlushRequest(req.asFlush(), responseBuilder); break;
-        case P9Protocol::MessageType::TStat:        onStatRequest(req.asStat(), responseBuilder); break;
+        case P9Protocol::MessageType::TVersion:     onVersionRequest(req.asVersion(), responseBuilder);     break;
+        case P9Protocol::MessageType::TAuth:        onAuthRequest(req.asAuth(), responseBuilder);           break;
+        case P9Protocol::MessageType::TAttach:      onAttachRequest(req.asAttach(), responseBuilder);       break;
+        case P9Protocol::MessageType::TFlush:       onFlushRequest(req.asFlush(), responseBuilder);         break;
+        case P9Protocol::MessageType::TWalk:        onWalkRequest(req.asWalk(), responseBuilder);           break;
+        case P9Protocol::MessageType::TOpen:        onOpenRequest(req.asOpen(), responseBuilder);           break;
+//        case P9Protocol::MessageType::TCreate:        onCreateRequest(req.asCreate(), responseBuilder);   break;
+        case P9Protocol::MessageType::TRead:        onReadRequest(req.asRead(), responseBuilder);           break;
+//        case P9Protocol::MessageType::TWrite:        onWriteRequest(req.asWrite(), responseBuilder);      break;
+        case P9Protocol::MessageType::TClunk:       onClankRequest(req.asClunk(), responseBuilder);         break;
+//        case P9Protocol::MessageType::TRemove:       onRemoveRequest(req.asRemove(), responseBuilder);    break;
+        case P9Protocol::MessageType::TStat:        onStatRequest(req.asStat(), responseBuilder);           break;
+//        case P9Protocol::MessageType::TWStat:        onWStatRequest(req.asWstat(), responseBuilder);      break;
 
-        case P9Protocol::MessageType::TRead:        onReadRequest(req.asRead(), responseBuilder); break;
-        case P9Protocol::MessageType::TWalk:        onWalkRequest(req.asWalk(), responseBuilder); break;
+//        case P9Protocol::MessageType::TSession:        onSessionRequest(req.asSession(), responseBuilder);  break;
+//        case P9Protocol::MessageType::TSRead:        onShortReadRequest(req.asShortRead(), responseBuilder);    break;
+//        case P9Protocol::MessageType::TSWrite:        onShortWriteRequest(req.asShortWrite(), responseBuilder);break;
+
         default:
             responseBuilder.error("Unsupported request");
             break;
@@ -377,30 +408,37 @@ private:
                 });
     }
 
+protected:
+
+    void closeNode(const std::shared_ptr<Node>& node) {
+        node->close(_uname);
+    }
+
 private:
 
     P9Protocol  _protocol;
 
     TcpSocket   _socket;
+    IPEndpoint  _remoteEndpoint;    // Remote peer endponit. We save it to use for logging as it may be not avaliable in some cases.
+
     ByteBuffer  _buffer;
-    ByteBuffer  _readBuffer;    // Temporary
 
     // TODO(abbyssoul): Better credential handling:
     String      _uname;
 
-    AsyncServer::DirectoryNode&                     _serverRoot;
-    std::map<P9Protocol::Fid, std::shared_ptr<AsyncServer::Node>>  _openedNodes;
+    DirectoryNode&                                      _serverRoot;
+    std::map<P9Protocol::Fid, std::shared_ptr<Node>>    _openedNodes;
 };
 
 
 
 std::shared_ptr<AsyncServer::Session>
 AsyncServer::spawnSession() {
-    // TODO(abbyssoul): Pick a free buffer from a pre-allocated pool or reject connection if non avaliable.
+    // TODO(abbyssoul): Pick a free buffer from a pre-allocated pool or reject connection if none avaliable.
     ByteBuffer msgBuf(_memManager.create(P9Protocol::MAX_MESSAGE_SIZE));
-    ByteBuffer readBuf(_memManager.create(P9Protocol::MAX_MESSAGE_SIZE));
 
-    auto session = std::make_shared<Session>(_root, std::move(_socket), std::move(msgBuf), std::move(readBuf));
+    // TODO(abbyssoul): Can we avoid memory allocation here and re-use / garbege collect memory?
+    auto session = std::make_shared<Session>(_root, std::move(_socket), std::move(msgBuf));
     session->start();
 
     return session;

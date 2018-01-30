@@ -108,6 +108,32 @@ public:
     }
 
 
+    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+        asio::error_code ec;
+
+        const auto len = _socket.receive(asio_buffer(dest, bytesToRead), 0, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            dest.advance(len);
+        }
+
+        return Ok();
+    }
+
+    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+        asio::error_code ec;
+
+        const auto len = _socket.send(asio_buffer(src, bytesToWrite), 0, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            src.advance(len);
+        }
+
+        return Ok();
+    }
+
     void cancel() {
         _socket.cancel();
     }
@@ -208,6 +234,14 @@ void UdpSocket::close() {
 
 void UdpSocket::connect(const IPEndpoint& endpoint) {
     _pimpl->connect(endpoint);
+}
+
+Result<void, Error> UdpSocket::read(ByteBuffer& dest, size_type bytesToRead) {
+    return _pimpl->read(dest, bytesToRead);
+}
+
+Result<void, Error> UdpSocket::write(ByteBuffer& src, size_type bytesToWrite) {
+    return _pimpl->write(src, bytesToWrite);
 }
 
 bool UdpSocket::isOpen() {

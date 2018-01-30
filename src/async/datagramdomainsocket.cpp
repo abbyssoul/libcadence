@@ -34,18 +34,6 @@ public:
     {}
 
 
-    Result<void, Error> connect(const NetworkEndpoint& endpoint) {
-        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
-        asio::error_code ec;
-
-        _socket.connect(destination, ec);
-        if (ec) {
-            return Err(fromAsioError(ec));
-        }
-
-        return Ok();
-    }
-
     Future<void> asyncConnect(const NetworkEndpoint& peer) {
         Promise<void> promise;
         auto f = promise.getFuture();
@@ -138,6 +126,45 @@ public:
         });
 
         return f;
+    }
+
+
+    Result<void, Error> connect(const NetworkEndpoint& endpoint) {
+        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
+        asio::error_code ec;
+
+        _socket.connect(destination, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
+    }
+
+    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+        asio::error_code ec;
+
+        const auto len = _socket.receive(asio_buffer(dest, bytesToRead), 0, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            dest.advance(len);
+        }
+
+        return Ok();
+    }
+
+    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+        asio::error_code ec;
+
+        const auto len = _socket.send(asio_buffer(src, bytesToWrite), 0, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        } else {
+            src.advance(len);
+        }
+
+        return Ok();
     }
 
 
@@ -243,6 +270,14 @@ void DatagramDomainSocket::close() {
 
 void DatagramDomainSocket::connect(const NetworkEndpoint& endpoint) {
     _pimpl->connect(endpoint);
+}
+
+Result<void, Error> DatagramDomainSocket::read(ByteBuffer& dest, size_type bytesToRead) {
+    return _pimpl->read(dest, bytesToRead);
+}
+
+Result<void, Error> DatagramDomainSocket::write(ByteBuffer& src, size_type bytesToWrite) {
+    return _pimpl->write(src, bytesToWrite);
 }
 
 bool DatagramDomainSocket::isOpen() {

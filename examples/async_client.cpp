@@ -26,7 +26,7 @@ using namespace cadence::async;
 
 Future<void> runTestSession(const String& rootName, const String& userName, const String& dir, AsyncClient& client) {
 
-    return client.beginSession(rootName, userName)
+    return client.asyncBeginSession(rootName, userName)
             .then([&client]() {
                 std::cout << "Session established" << std::endl;
             })
@@ -42,9 +42,9 @@ Future<void> runTestSession(const String& rootName, const String& userName, cons
             })
             .then([&client]() {
                 return client.read(Path({"data", "updated"}))
-                        .then([](Solace::MemoryView&& data) {
+                        .then([](AsyncClient::TransactionalMemoryView&& txdata) {
                             std::cout << "read> \'";
-                            std::cout.write(data.dataAs<const char>(), data.size());
+                            std::cout.write(txdata.data.dataAs<const char>(), txdata.data.size());
                             std::cout << "\'" << std::endl;
                         });
             })

@@ -24,7 +24,7 @@ class TcpSocket::TcpSocketImpl {
 public:
 
     TcpSocketImpl(void* ioservice) :
-        _socket(*static_cast<asio::io_service*>(ioservice))
+        _socket(asAsioService(ioservice))
     {}
 
     TcpSocketImpl(TcpSocketImpl&& other) :
@@ -72,22 +72,34 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        _socket.async_connect(toAsioTCPEndpoint(endpoint),
-        [pm = std::move(promise)] (const asio::error_code& error) mutable {
-            if (error) {
-                pm.setError(fromAsioError(error));
-            } else {
-                pm.setValue();
-            }
-        });
+        asio::error_code ec;
+        const auto asioEndpoint = toAsioTCPEndpoint(endpoint, ec);
+        if (ec) {
+            promise.setError(fromAsioError(ec));
+            return f;
+        }
+
+        _socket.async_connect(asioEndpoint, [pm = std::move(promise)] (const asio::error_code& error) mutable {
+                if (error) {
+                    pm.setError(fromAsioError(error));
+                } else {
+                    pm.setValue();
+                }
+            });
 
         return f;
     }
 
-    Result<void, Error> connect(const IPEndpoint& endpoint) {
-        asio::error_code ec;
+    Result<void, Error>
+    connect(const IPEndpoint& endpoint) {
 
-        _socket.connect(toAsioTCPEndpoint(endpoint), ec);
+        asio::error_code ec;
+        const auto asioEndpoint = toAsioTCPEndpoint(endpoint, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        _socket.connect(asioEndpoint, ec);
         if (ec) {
             return Err(fromAsioError(ec));
         }
@@ -165,15 +177,20 @@ class TcpAcceptor::AcceptorImpl {
 public:
 
     AcceptorImpl(void* ioservice) :
-        _acceptor(*static_cast<asio::io_service*>(ioservice))
+        _acceptor(asAsioService(ioservice))
     {
     }
 
-    // FIXME: We are listening on all interfaces over ipv4 here.
-    AcceptorImpl(void* ioservice, uint16 port) :
-        _acceptor(*static_cast<asio::io_service*>(ioservice), asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
+    AcceptorImpl(void* ioservice, const IPEndpoint& endpoint) :
+        _acceptor(asAsioService(ioservice), toAsioTCPEndpoint(endpoint))
     {
     }
+
+    AcceptorImpl(void* ioservice, uint16 port) :
+        _acceptor(asAsioService(ioservice), asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
+    {
+    }
+
 
     Future<void> asyncAccept(TcpSocket::TcpSocketImpl* socket) {
         Promise<void> promise;
@@ -205,7 +222,10 @@ public:
     Result<void, Error> open(const IPEndpoint& endpoint, int32 backlog, bool reuseAddr = true) {
         asio::error_code ec;
 
-        auto e = toAsioTCPEndpoint(endpoint);
+        auto e = toAsioTCPEndpoint(endpoint, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
 
         if (!_acceptor.is_open()) {
             _acceptor.open(e.protocol(), ec);
@@ -265,6 +285,11 @@ public:
         return !_acceptor.is_open();
     }
 
+    IPEndpoint getLocalEndpoint() const {
+        return fromAsioEndpoint(_acceptor.local_endpoint());
+    }
+
+
 private:
     asio::ip::tcp::acceptor _acceptor;
 };
@@ -283,6 +308,12 @@ TcpAcceptor::TcpAcceptor(EventLoop& ioContext) :
     _pimpl(std::make_unique<AcceptorImpl>(ioContext.getIOService()))
 {
 }
+
+TcpAcceptor::TcpAcceptor(EventLoop& ioContext, const IPEndpoint& endpoint)  :
+    _pimpl(std::make_unique<AcceptorImpl>(ioContext.getIOService(), endpoint))
+{
+}
+
 
 TcpAcceptor::TcpAcceptor(TcpAcceptor&& rhs) :
   _pimpl(std::move(rhs._pimpl))
@@ -340,6 +371,12 @@ TcpAcceptor::asyncAccept(TcpSocket& socket) {
     return _pimpl->asyncAccept(socket._pimpl.get());
 }
 
+IPEndpoint TcpAcceptor::getLocalEndpoint() const {
+    return _pimpl->getLocalEndpoint();
+}
+
+
+
 
 TcpSocket::~TcpSocket()
 {
@@ -391,15 +428,20 @@ void TcpSocket::close() {
     _pimpl->close();
 }
 
-Result<void, Error> TcpSocket::connect(const NetworkEndpoint& endpoint) {
+
+Result<void, Error>
+TcpSocket::connect(const NetworkEndpoint& endpoint) {
+    // FIXME: Fucked-up upcast without type-check!
     return _pimpl->connect(*static_cast<const IPEndpoint*>(&endpoint));
 }
 
-Result<void, Error> TcpSocket::read(ByteBuffer& dest, size_type bytesToRead) {
+Result<void, Error>
+TcpSocket::read(ByteBuffer& dest, size_type bytesToRead) {
     return _pimpl->read(dest, bytesToRead);
 }
 
-Result<void, Error> TcpSocket::write(ByteBuffer& src, size_type bytesToWrite) {
+Result<void, Error>
+TcpSocket::write(ByteBuffer& src, size_type bytesToWrite) {
     return _pimpl->write(src, bytesToWrite);
 }
 

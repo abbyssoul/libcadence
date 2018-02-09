@@ -34,8 +34,8 @@ class Pipe::PipeImpl {
 public:
 
     PipeImpl(void* ioservice) :
-        _in(*static_cast<asio::io_service*>(ioservice)),
-        _out(*static_cast<asio::io_service*>(ioservice))
+        _in(asAsioService(ioservice)),
+        _out(asAsioService(ioservice))
     {
         int fds[2] = { 0 };
         createNonblockingPipe(fds);

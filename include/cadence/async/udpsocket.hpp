@@ -127,7 +127,7 @@ public:
      * Connect the socket to the specified endpoint syncroniosly.
      * @param endpoint
      */
-    void connect(const IPEndpoint& endpoint);
+    Solace::Result<void, Solace::Error> connect(const IPEndpoint& endpoint);
 
     /** @see Channel::read */
     Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) override;

@@ -22,7 +22,7 @@ class StreamDomainSocket::StreamDomainSocketImpl {
 public:
 
     StreamDomainSocketImpl(void* ioservice) :
-        _socket(*static_cast<asio::io_service*>(ioservice))
+        _socket(asAsioService(ioservice))
     {}
 
     StreamDomainSocketImpl(StreamDomainSocketImpl&& other) :
@@ -193,7 +193,7 @@ class StreamDomainAcceptor::AcceptorImpl {
 public:
 
     AcceptorImpl(void* ioservice, const String& file) :
-        _acceptor(*static_cast<asio::io_service*>(ioservice), asio::local::stream_protocol::endpoint(file.to_str()))
+        _acceptor(asAsioService(ioservice), asio::local::stream_protocol::endpoint(file.to_str()))
     {
     }
 

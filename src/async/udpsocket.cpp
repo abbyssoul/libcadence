@@ -22,13 +22,13 @@ class UdpSocket::UdpImpl {
 public:
 
     UdpImpl(void* ioservice) :
-        _socket(*static_cast<asio::io_service*>(ioservice)),
-        _resolver(*static_cast<asio::io_service*>(ioservice))
+        _socket(asAsioService(ioservice)),
+        _resolver(asAsioService(ioservice))
     {}
 
     UdpImpl(void* ioservice, uint16 port) :
-        _socket(*static_cast<asio::io_service*>(ioservice), asio::ip::udp::endpoint(asio::ip::udp::v4(), port)),
-        _resolver(*static_cast<asio::io_service*>(ioservice))
+        _socket(asAsioService(ioservice), asio::ip::udp::endpoint(asio::ip::udp::v4(), port)),
+        _resolver(asAsioService(ioservice))
     {}
 
 
@@ -55,7 +55,13 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        auto senderEndpoint = toAsioEndpoint(addr);
+        asio::error_code ec;
+        auto senderEndpoint = toAsioEndpoint(addr, ec);
+        if (ec) {
+            promise.setError(fromAsioError(ec));
+            return f;
+        }
+
         // NOTE: We can pass sender endpoint to future here
         _socket.async_receive_from(asio_buffer(dest, bytesToRead), senderEndpoint,
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
@@ -94,7 +100,14 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        _socket.async_send_to(asio_buffer(src, bytesToWrite), toAsioEndpoint(addr),
+        asio::error_code ec;
+        const auto asioEndpoint = toAsioEndpoint(addr, ec);
+        if (ec) {
+            promise.setError(fromAsioError(ec));
+            return f;
+        }
+
+        _socket.async_send_to(asio_buffer(src, bytesToWrite), asioEndpoint,
             [pm = std::move(promise), &src](asio::error_code error, std::size_t length) mutable {
             if (error) {
                 pm.setError(fromAsioError(error));
@@ -142,8 +155,20 @@ public:
         _socket.close();
     }
 
-    void connect(const IPEndpoint& addr) {
-        _socket.connect(toAsioEndpoint(addr));
+    Result<void, Error>
+    connect(const IPEndpoint& addr) {
+        asio::error_code ec;
+        const auto asioEndpoint = toAsioEndpoint(addr, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        _socket.connect(asioEndpoint, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
     }
 
     bool isOpen() {
@@ -232,8 +257,9 @@ void UdpSocket::close() {
     _pimpl->close();
 }
 
-void UdpSocket::connect(const IPEndpoint& endpoint) {
-    _pimpl->connect(endpoint);
+Result<void, Error>
+UdpSocket::connect(const IPEndpoint& endpoint) {
+    return _pimpl->connect(endpoint);
 }
 
 Result<void, Error> UdpSocket::read(ByteBuffer& dest, size_type bytesToRead) {

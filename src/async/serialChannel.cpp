@@ -67,7 +67,7 @@ public:
                                  Serial::Parity parity,
                                  Serial::Stopbits stopbits,
                                  Serial::Flowcontrol flowcontrol) :
-        _serial(*static_cast<asio::io_service*>(ioservice), file.toString().c_str())
+        _serial(asAsioService(ioservice), file.toString().c_str())
     {
         _serial.set_option(asio::serial_port_base::baud_rate(baudrate));
         _serial.set_option(asio::serial_port_base::character_size(static_cast<uint32>(bytesize)));

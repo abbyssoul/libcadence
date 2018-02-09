@@ -25,12 +25,11 @@ public:
 
 
     SocketImpl(void* ioservice, const String& endpoing) :
-        _socket(*static_cast<asio::io_service*>(ioservice),
-            asio::local::datagram_protocol::endpoint(endpoing.to_str()))
+        _socket(asAsioService(ioservice), asio::local::datagram_protocol::endpoint(endpoing.to_str()))
     {}
 
     SocketImpl(void* ioservice) :
-        _socket(*static_cast<asio::io_service*>(ioservice))
+        _socket(asAsioService(ioservice))
     {}
 
 

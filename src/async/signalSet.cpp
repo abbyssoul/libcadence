@@ -22,7 +22,7 @@ class SignalSet::SignalSetImpl {
 public:
 
     SignalSetImpl(void* ioservice, std::initializer_list<int> signal) :
-        _signals(*static_cast<asio::io_service*>(ioservice))
+        _signals(asAsioService(ioservice))
     {
         for (auto i : signal) {
             _signals.add(i);

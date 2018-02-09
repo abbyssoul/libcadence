@@ -25,7 +25,7 @@ using namespace cadence::async;
 class Event::EventImpl {
 public:
     EventImpl(void* ioservice):
-        _eventFd(*static_cast<asio::io_service*>(ioservice), eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
+        _eventFd(asAsioService(ioservice), eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
     {}
 
     void notify() {

@@ -142,17 +142,28 @@ public:
     ~TcpAcceptor();
 
     /**
-     * Construct an acceptor without opening it.
+     * Construct an acceptor without actually opening a port.
+     * Acceptor constructed this way won't be able to accept any connection untill @see open is called.
+     *
      * @param ioContext ioContext
      */
     TcpAcceptor(EventLoop& ioContext);
 
     /**
-     * Construct an acceptor opened on the given endpoint.
+     * Construct an acceptor and open in on the deafult interface and a given port.
+     *
      * @param ioContext Event loop object.
-     * @param port Port to open acceptor at.
+     * @param port Port on the default interface to open acceptor on.
      */
     TcpAcceptor(EventLoop& ioContext, Solace::uint16 port);
+
+    /**
+     * Construct an acceptor and open in on the given endpoint.
+     *
+     * @param ioContext Event loop object.
+     * @param endpoint Endpoint to open acceptor on.
+     */
+    TcpAcceptor(EventLoop& ioContext, const IPEndpoint& endpoint);
 
     TcpAcceptor(const TcpAcceptor& rhs) = delete;
     TcpAcceptor& operator= (const TcpAcceptor& rhs) = delete;
@@ -183,6 +194,12 @@ public:
 
     void cancel();
     void close();
+
+    /**
+     * Get the local endpoint of the acceptor socket.
+     * @return Local endpoint this acceptor is bound to.
+     */
+    IPEndpoint getLocalEndpoint() const;
 
 private:
 

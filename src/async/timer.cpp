@@ -21,12 +21,11 @@ using namespace cadence::async;
 class Timer::TimerImpl {
 public:
     TimerImpl(void* ioservice) :
-        _timer(*static_cast<asio::io_service*>(ioservice))
+        _timer(asAsioService(ioservice))
     {}
 
     TimerImpl(void* ioservice, duration_type duration) :
-        _timer(*static_cast<asio::io_service*>(ioservice),
-                            boost::posix_time::milliseconds(duration.count()))
+        _timer(asAsioService(ioservice), boost::posix_time::milliseconds(duration.count()))
     {}
 
 

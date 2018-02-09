@@ -17,10 +17,53 @@
 
 namespace cadence {
 
+    inline asio::io_service& asAsioService(void* ioservice) {
+        return *static_cast<asio::io_service*>(ioservice);
+    }
+
+    /**
+     * Convert cadence::IPEndpoint into asio tcp::endpoint.
+     * This is not throwing version.
+     *
+     * @param addr IPEndpoint to convert.
+     * @return asio endpoint represening the same input.
+     */
+    inline
+    asio::ip::tcp::endpoint toAsioTCPEndpoint(const IPEndpoint& addr, asio::error_code& ec) {
+        auto asioAddr = asio::ip::make_address(addr.getAddress().c_str(), ec);
+
+        if (ec) {
+            return asio::ip::tcp::endpoint();
+        }
+
+        return asio::ip::tcp::endpoint(asioAddr, addr.getPort());
+    }
+
+
+    /**
+     * Convert cadence::IPEndpoint into asio tcp::endpoint.
+     * Note: This is exception throwing version. It is to be used only in constructor where using error codes
+     * is not an option.
+     *
+     * @param addr IPEndpoint to convert.
+     * @return asio endpoint represening the same input.
+     */
     inline
     asio::ip::tcp::endpoint toAsioTCPEndpoint(const IPEndpoint& addr) {
         return asio::ip::tcp::endpoint(asio::ip::make_address(addr.getAddress().c_str()), addr.getPort());
     }
+
+    inline
+    asio::ip::udp::endpoint toAsioEndpoint(const IPEndpoint& addr, asio::error_code& ec) {
+        auto ip = asio::ip::make_address(addr.getAddress().c_str(), ec);
+
+        if (ec) {
+            return asio::ip::udp::endpoint();
+        }
+
+        return asio::ip::udp::endpoint(ip, addr.getPort());
+    }
+
 
     inline
     asio::ip::udp::endpoint toAsioEndpoint(const IPEndpoint& addr) {

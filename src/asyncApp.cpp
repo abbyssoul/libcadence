@@ -11,7 +11,7 @@
 #include <solace/exception.hpp>
 
 
-#include <signal.h>     // Definition of well know process signals
+#include <csignal>     // Definition of well know process signals
 
 // Error logging output
 #include <iostream>

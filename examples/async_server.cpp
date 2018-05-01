@@ -15,14 +15,13 @@
 
 #include <solace/memoryManager.hpp>
 #include <solace/uuid.hpp>
-#include <solace/framework/commandlineParser.hpp>
+#include <solace/cli/parser.hpp>
 
 
 #include <iostream>
 
 
 using namespace Solace;
-using namespace Solace::Framework;
 using namespace cadence;
 using namespace cadence::async;
 
@@ -30,13 +29,15 @@ using namespace cadence::async;
 
 int main(int argc, const char **argv) {
     uint16 serverPort = 5640;
-    String serverEndpoint("127.0.0.1");
+    StringView serverEndpoint("127.0.0.1");
 
-    auto res = CommandlineParser("libcadence/async_server", {
-                            CommandlineParser::printHelp(),
-                            CommandlineParser::printVersion("async_clent", cadence::getBuildVersion()),
-                            {'p', "port", "Server port", &serverPort},
-                            {'h', "host", "Server listen address", &serverEndpoint}})
+    auto res = cli::Parser("libcadence/async_server", {
+                            cli::Parser::printHelp(),
+                            cli::Parser::printVersion("async_clent", cadence::getBuildVersion()),
+
+                            {{"p", "port"}, "Server port", &serverPort},
+                            {{"h", "host"}, "Server listen address", &serverEndpoint}
+                           })
             .parse(argc, argv);
 
     if (!res) {
@@ -54,9 +55,7 @@ int main(int argc, const char **argv) {
     }
 
     MemoryManager memManager(3 * 8*1024);
-    EventLoop iocontext;
 
-    AsyncServer server(iocontext, memManager);
 
     char simpleMessage[] = "Hello data!\n";
     ByteBuffer dataBuffer(memManager.create(128));
@@ -67,6 +66,8 @@ int main(int argc, const char **argv) {
 
     auto region2 = UUID::random();
 
+    EventLoop iocontext;
+    AsyncServer server(iocontext, memManager);
     server.mount(Path("simple"), std::make_shared<DataNode>(wrapMemory(simpleMessage)));
     server.mount(Path("regions"), std::make_shared<DirectoryNode>());
     server.mount(Path({"regions", "test1"}), std::make_shared<DataNode>(dataBuffer.viewWritten()));

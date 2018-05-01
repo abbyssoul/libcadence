@@ -20,6 +20,7 @@
 #include <solace/result.hpp>
 #include <solace/error.hpp>
 #include <solace/memoryManager.hpp>
+#include <solace/byteBuffer.hpp>
 
 #include <memory>
 #include <map>
@@ -35,7 +36,7 @@ namespace cadence {
  */
 class Node {
 public:
-    virtual ~Node();
+    virtual ~Node() = default;
 
     /**
      * Mount a new node under a given path.

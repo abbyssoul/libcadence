@@ -22,11 +22,6 @@ P9Protocol::Stat nodeStats(const String& name, const std::shared_ptr<Node>& node
 
 
 
-
-Node::~Node() {
-}
-
-
 Result<void, Error>
 Node::mount(const String& , std::shared_ptr<Node>&& ) {
     return Err(Error("Not a directory"));

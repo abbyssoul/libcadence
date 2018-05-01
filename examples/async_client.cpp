@@ -13,25 +13,25 @@
 #include <cadence/version.hpp>
 
 #include <solace/memoryManager.hpp>
-#include <solace/framework/commandlineParser.hpp>
+#include <solace/cli/parser.hpp>
 
 
 #include <iostream>
 
 using namespace Solace;
-using namespace Solace::Framework;
 using namespace cadence;
 using namespace cadence::async;
 
 
-Future<void> runTestSession(const String& rootName, const String& userName, const String& dir, AsyncClient& client) {
+Future<void>
+runTestSession(const String& rootName, const String& userName, const String& dir, AsyncClient& client) {
 
-    return client.asyncBeginSession(rootName, userName)
-            .then([&client]() {
+    return client.beginSessionAsync(rootName, userName)
+            .then([]() {
                 std::cout << "Session established" << std::endl;
             })
             .then([&client, &dir]() {
-                return client.list(Path::parse(dir))
+                return client.listAsync(Path::parse(dir))
                         .then([](Solace::Array<Solace::Path>&& list) {
                             std::cout << "ls> " << std::endl;
                             for (auto& path : list) {
@@ -41,14 +41,14 @@ Future<void> runTestSession(const String& rootName, const String& userName, cons
                         });
             })
             .then([&client]() {
-                return client.read(Path({"data", "updated"}))
+                return client.readAsync(Path({"data", "updated"}))
                         .then([](AsyncClient::TransactionalMemoryView&& txdata) {
                             std::cout << "read> \'";
                             std::cout.write(txdata.data.dataAs<const char>(), txdata.data.size());
                             std::cout << "\'" << std::endl;
                         });
             })
-            .onError([](Solace::Error&& err) {
+            .onError([](Error&& err) {
                 std::cerr << "Error: " << err.toString() << std::endl;
             });
 }
@@ -58,20 +58,20 @@ int main(int argc, const char **argv) {
 
     P9Protocol::size_type bufferSize = P9Protocol::MAX_MESSAGE_SIZE;
     uint16 serverPort = 5640;
-    String userName;
-    String rootName("");
-    String serverEndpoint("127.0.0.1");
-    String dir("data");
+    StringView userName;
+    StringView rootName("");
+    StringView serverEndpoint("127.0.0.1");
+    StringView dir("data");
 
-    auto res = CommandlineParser("libcadence/async_client", {
-                            CommandlineParser::printHelp(),
-                            CommandlineParser::printVersion("async_clent", cadence::getBuildVersion()),
-                            {'p', "port", "Server port", &serverPort},
-                            {'u', "user", "User name to Authenticate as", &userName},
-                            {'r', "root", "Resource root to attach to", &rootName},
-                            {'m', "msgSize", "Maximum message size", &bufferSize},
-                            {'h', "host", "Resource server endpoint", &serverEndpoint}},
-                        {{"dir", "Directory to explore", &dir}})
+    auto res = cli::Parser("libcadence/async_client", {
+                            cli::Parser::printHelp(),
+                            cli::Parser::printVersion("async_clent", cadence::getBuildVersion()),
+                            {{"p", "port"}, "Server port", &serverPort},
+                            {{"u", "user"}, "User name to Authenticate as", &userName},
+                            {{"r", "root"}, "Resource root to attach to", &rootName},
+                            {{"m", "msgSize"}, "Maximum message size", &bufferSize},
+                            {{"h", "host"}, "Resource server endpoint", &serverEndpoint},
+                            {{"d", "dir"}, "Directory to explore", &dir}})
             .parse(argc, argv);
 
     if (!res) {

@@ -33,7 +33,7 @@ protected:
     class TransactionPool;
 
 public:
-    typedef P9Protocol::Tag TransactionId;
+    using TransactionId = P9Protocol::Tag;
 
     struct TransactionalMemoryView {
 
@@ -71,7 +71,7 @@ public:
     AsyncClient(std::unique_ptr<async::Channel> socket, Solace::MemoryManager& mem, Solace::uint32 concurrencyHint = 2);
 
     /// Move constructor
-    AsyncClient(AsyncClient&& rhs) noexcept;
+    AsyncClient(AsyncClient&& rhs) noexcept = default;
 
     AsyncClient& operator= (AsyncClient&& rhs) noexcept {
         return swap(rhs);
@@ -93,7 +93,7 @@ public:
 
     /**
      * Establish a new session with the resource server.
-     * @return Future of an established session, or an error.
+     * @return Result of an established session or an error.
      */
     Solace::Result<void, Solace::Error>
     beginSession(const Solace::String& resource, const Solace::String& cred);
@@ -103,7 +103,7 @@ public:
      * @return Future of an established session, or an error.
      */
     Solace::Future<void>
-    asyncBeginSession(const Solace::String& resource, const Solace::String& cred);
+    beginSessionAsync(const Solace::String& resource, const Solace::String& cred);
 
     /**
      * Read data given resource / key.
@@ -111,7 +111,7 @@ public:
      * @return Future data if the read succeed, an error otherwise.
      */
     Solace::Future<TransactionalMemoryView>
-    read(const Solace::Path& path);
+    readAsync(const Solace::Path& path);
 
     /**
      * Write given data under the specified path / key.
@@ -120,7 +120,7 @@ public:
      * @return Future to indicate successful operation or an error otherwise.
      */
     Solace::Future<void>
-    write(const Solace::Path& path, const Solace::ImmutableMemoryView& data);
+    writeAsync(const Solace::Path& path, const Solace::ImmutableMemoryView& data);
 
     /**
      * List resources under the given path / key.
@@ -129,7 +129,7 @@ public:
      * @return Future of resources under the path or failure otherwise.
      */
     Solace::Future<Solace::Array<Solace::Path>>
-    list(const Solace::Path& path);
+    listAsync(const Solace::Path& path);
 
 protected:
 

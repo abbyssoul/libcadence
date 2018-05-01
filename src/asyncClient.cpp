@@ -98,6 +98,7 @@ AsyncClient::AsyncClient(std::unique_ptr<async::Channel> socket, MemoryManager& 
 {
 }
 
+/*
 AsyncClient::AsyncClient(AsyncClient&& rhs) noexcept :
     _memoryManage(std::move(rhs._memoryManage)),
     _socket(std::move(rhs._socket)),
@@ -107,6 +108,7 @@ AsyncClient::AsyncClient(AsyncClient&& rhs) noexcept :
     _transactionPool(std::move(rhs._transactionPool)),
     _fidMap(std::move(rhs._fidMap))
 {}
+*/
 
 /*
 Future<void>
@@ -159,7 +161,7 @@ AsyncClient::beginSession(const String& resource, const String& cred) {
 
 
 Future<void>
-AsyncClient::asyncBeginSession(const String& resource, const String& cred) {
+AsyncClient::beginSessionAsync(const String& resource, const String& cred) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
 
@@ -335,7 +337,7 @@ Future<AsyncClient::TransactionalMemoryView>
 AsyncClient::read(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type iounit) {
     auto& tx = _transactionPool.allocateTransaction();
 
-    if (iounit == 0) {  // Maximum number of butes that can be read in one frame
+    if (iounit == 0) {  // Maximum number of bytes that can be read in one frame
                         // is the size of the message frame less the message header and data size.
         iounit = _resourceProtocol.maxNegotiatedMessageSize() -
                 (_resourceProtocol.headerSize() + sizeof(P9Protocol::size_type));
@@ -388,7 +390,7 @@ AsyncClient::clunk(P9Protocol::Fid fid) {
 
 
 Future<AsyncClient::TransactionalMemoryView>
-AsyncClient::read(const Path& path) {
+AsyncClient::readAsync(const Path& path) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
 
@@ -415,7 +417,7 @@ AsyncClient::read(const Path& path) {
 
 
 Future<void>
-AsyncClient::write(const Path& path, const Solace::ImmutableMemoryView& data) {
+AsyncClient::writeAsync(const Path& path, const Solace::ImmutableMemoryView& data) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
 
@@ -465,7 +467,7 @@ AsyncClient::readDir(P9Protocol::Fid fid, uint64 offset, P9Protocol::size_type i
 
 
 Future<Array<Path>>
-AsyncClient::list(const Path& path) {
+AsyncClient::listAsync(const Path& path) {
     // Prepare the version request
     auto& tx = _transactionPool.allocateTransaction();
 

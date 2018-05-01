@@ -11,17 +11,18 @@
 #include <cadence/version.hpp>
 
 #include <solace/memoryManager.hpp>
-#include <solace/framework/commandlineParser.hpp>
+#include <solace/cli/parser.hpp>
 
 
 #include <iostream>
 
 using Solace::uint32;
+using Solace::StringView;
 using Solace::String;
 using Solace::Path;
 using Solace::MemoryManager;
 using Solace::ByteBuffer;
-using Solace::Framework::CommandlineParser;
+using Solace::cli::Parser;
 
 using namespace cadence::async;
 
@@ -44,15 +45,14 @@ int main(int argc, const char **argv) {
 
     uint32 boudRate = 115200;
     uint32 bufferSize = 120;
-    String devPath;
+    StringView devPath;
 
-    auto res = CommandlineParser("libcadence/async_serial", {
-                          CommandlineParser::printHelp(),
-                          CommandlineParser::printVersion("async_serial", cadence::getBuildVersion()),
-                          {'b', "boud", "Boud rate", &boudRate},
-                          {0, "bufferSize", "Read buffer size", &bufferSize}
-                      },
-                      {{"path", "Path to the serial device", &devPath}})
+    auto res = Parser("libcadence/async_serial", {
+                          Parser::printHelp(),
+                          Parser::printVersion("async_serial", cadence::getBuildVersion()),
+                          {{"b", "boud"}, "Boud rate", &boudRate},
+                          {{"bufferSize"}, "Read buffer size", &bufferSize},
+                          {{"f", "file"}, "Path to the serial device", &devPath}})
             .parse(argc, argv);
 
     if (!res) {
@@ -76,13 +76,14 @@ int main(int argc, const char **argv) {
     MemoryManager memManager(2048);
     ByteBuffer readBuffer(memManager.create(bufferSize));
 
-    serial.asyncRead(readBuffer).then([&readBuffer]() {
-        auto dataView = readBuffer.viewWritten();
-        std::cout.write(dataView.dataAs<const char>(), dataView.size());
-        std::cout.flush();
+    serial.asyncRead(readBuffer)
+            .then([&readBuffer]() {
+                auto dataView = readBuffer.viewWritten();
+                std::cout.write(dataView.dataAs<const char>(), dataView.size());
+                std::cout.flush();
 
-        readBuffer.rewind();
-    });
+                readBuffer.rewind();
+            });
 
     iocontext.run();
 

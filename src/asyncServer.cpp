@@ -86,7 +86,8 @@ AsyncServer::mount(const Path& path, std::shared_ptr<Node>&& newNode) {
         if (isLastComponent) {
             return node->mount(pathComponent, std::move(newNode));
         } else {
-            const auto walkResult = _root.walk(pathComponent);
+            const auto walkResult = node->walk(pathComponent);
+
             if (walkResult) {
                 node = walkResult.unwrap().get();
             } else {

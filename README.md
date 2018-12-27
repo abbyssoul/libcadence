@@ -18,7 +18,7 @@
 [coveralls-shield]: https://coveralls.io/repos/github/abbyssoul/libcadence/badge.svg?branch=master
 [coveralls-link]: https://coveralls.io/github/abbyssoul/libcadence?branch=master
 
-libcadence is a _library_ of IPC components.
+libcadence is a _library_ of Inter-process communication (IPC) components.
 > library: a collection of types, functions, classes, etc. implementing a set of facilities (abstractions) meant to be potentially used as part of more that one program. From [Cpp Code guidelines gloassay](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#glossary)
 
 See [examples](docs/examples.md) for some examples of using this library.

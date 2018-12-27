@@ -25,17 +25,18 @@ namespace cadence { namespace async {
 /**
  * An async wrapper for the POSIX pipe
  */
-class Pipe : public Channel {
+class Pipe :
+        public Channel {
 public:
 
-    ~Pipe();
+    ~Pipe() override;
 
     Pipe(const Pipe& rhs) = delete;
     Pipe& operator= (const Pipe& rhs) = delete;
 
     Pipe(EventLoop& ioContext);
 
-    Pipe(Pipe&& rhs);
+    Pipe(Pipe&& rhs) noexcept;
 
     Pipe& operator= (Pipe&& rhs) noexcept {
         return swap(rhs);
@@ -55,7 +56,7 @@ public:
 	 *
 	 * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
 	 */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+    Solace::Future<void> asyncRead(Solace::ByteWriter& dest, size_type bytesToRead) override;
 
 	/**
 	 * Post an async write request to write specified amount of data into this IO object.
@@ -66,13 +67,27 @@ public:
 	 *
 	 * @note If the provided source buffer does not have requested amount of data - an exception is raised.
 	 */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+    Solace::Future<void> asyncWrite(Solace::ByteReader& src, size_type bytesToWrite) override;
 
     /** @see Channel::read */
-    Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+    Solace::Result<void, Solace::Error> read(Solace::ByteWriter& dest, size_type bytesToRead) override;
 
     /** @see Channel::write */
-    Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+    Solace::Result<void, Solace::Error> write(Solace::ByteReader& src, size_type bytesToWrite) override;
+
+
+    /** @see Channel::cancel */
+    void cancel() override;
+
+    /** @see Channel::close */
+    void close() override;
+
+    /** @see Channel::isOpen */
+    bool isOpen() override;
+
+    /** @see Channel::isClosed */
+    bool isClosed() override;
+
 
 private:
 

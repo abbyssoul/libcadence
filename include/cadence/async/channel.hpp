@@ -21,6 +21,11 @@
 #include "cadence/async/eventloop.hpp"
 
 
+#include <solace/byteReader.hpp>
+#include <solace/byteWriter.hpp>
+#include <solace/future.hpp>
+
+
 namespace cadence { namespace async {
 
 
@@ -30,22 +35,22 @@ namespace cadence { namespace async {
  */
 class Channel {
 public:
-    typedef EventLoop::size_type size_type;
+
+    using size_type = Solace::ByteWriter::size_type;
 
 public:
 
-    virtual ~Channel() = default;
+    virtual ~Channel();
 
     Channel(const Channel&) = delete;
     Channel& operator= (const Channel& rhs) = delete;
 
     Channel(EventLoop& ioContext) :
         _ioContext(&ioContext)
-    {
-    }
+    {}
 
     Channel(Channel&& rhs) :
-        _ioContext(&rhs.getIOContext())
+        _ioContext(std::exchange(rhs._ioContext, nullptr))
     {}
 
     Channel& operator= (Channel&& rhs) noexcept {
@@ -73,7 +78,7 @@ public:
      * @param dest The provided destination buffer to read data into.
      * @return A future that will be resolved one the buffer has been filled.
      */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest) {
+    Solace::Future<void> asyncRead(Solace::ByteWriter& dest) {
         return asyncRead(dest, dest.remaining());
     }
 
@@ -86,7 +91,7 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    virtual Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) = 0;
+    virtual Solace::Future<void> asyncRead(Solace::ByteWriter& dest, size_type bytesToRead) = 0;
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -95,7 +100,7 @@ public:
      * @param src The provided source buffer to read data from.
      * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
      */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src) {
+    Solace::Future<void> asyncWrite(Solace::ByteReader& src) {
         return asyncWrite(src, src.remaining());
     }
 
@@ -108,7 +113,7 @@ public:
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    virtual Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) = 0;
+    virtual Solace::Future<void> asyncWrite(Solace::ByteReader& src, size_type bytesToWrite) = 0;
 
     /**
      * Read request synchroniously from this IO object into the given buffer.
@@ -117,7 +122,7 @@ public:
      * @param dest The provided destination buffer to read data into.
      * @return A operation result or an error.
      */
-    Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest) {
+    Solace::Result<void, Solace::Error> read(Solace::ByteWriter& dest) {
         return read(dest, dest.remaining());
     }
 
@@ -131,7 +136,7 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    virtual Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) = 0;
+    virtual Solace::Result<void, Solace::Error> read(Solace::ByteWriter& dest, size_type bytesToRead) = 0;
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -140,7 +145,7 @@ public:
      * @param src The provided source buffer to read data from.
      * @return A operation result or an error.
      */
-    Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src) {
+    Solace::Result<void, Solace::Error> write(Solace::ByteReader& src) {
         return write(src, src.remaining());
     }
 
@@ -153,8 +158,31 @@ public:
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    virtual Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src, size_type bytesToWrite) = 0;
+    virtual Solace::Result<void, Solace::Error> write(Solace::ByteReader& src, size_type bytesToWrite) = 0;
 
+
+    /**
+     * Cancel all asynchronous operations associated with the channel.
+     */
+    virtual void cancel() = 0;
+
+    /**
+     * Close the channel.
+     */
+    virtual void close() = 0;
+
+
+    /**
+     * Determine whether the channel is open.
+     * @return True if the channel is opened.
+     */
+    virtual bool isOpen() = 0;
+
+    /**
+     * Determine whether the channel is closed.
+     * @return True if the channel is NOT opened.
+     */
+    virtual bool isClosed() = 0;
 
 private:
 

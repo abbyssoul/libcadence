@@ -15,6 +15,8 @@
  *******************************************************************************/
 #include <cadence/async/signalSet.hpp>  // Class being tested
 
+#include <solace/output_utils.hpp>
+
 #include "gtest/gtest.h"
 
 #include <thread>

@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+DIR="$( cd "$( dirname "${0}" )" && pwd )"
 project_name=$(basename $DIR)
 prefix=/usr/local
 debugsym=true
@@ -58,6 +58,18 @@ if $sanitizer; then
     echo 'sanitize = address,undefined,leak' >> Makefile
 fi
 
+if [ ! -z "${CXX}" ] || [ ! -z "${CC}" ] ; then
+    echo "Using custom copiler: CXX=$CXX CC=$CC"
+    printf "\n# Compiler config\n" >> Makefile
+
+    if [ ! -z "${CXX}" ] ; then
+        echo "CXX ?= ${CXX}" >> Makefile
+    fi
+
+    if [ ! -z "${CC}" ]; then
+        echo "CC ?= ${CC}" >> Makefile
+    fi
+fi
 
 echo '' >> Makefile
 cat Makefile.in >> Makefile

@@ -9,9 +9,10 @@
 /*******************************************************************************
  * @file: async/_signalset.cpp
  *******************************************************************************/
-#include <cadence/async/signalSet.hpp>
+#include "cadence/async/signalSet.hpp"
 
 #include "asio_helper.hpp"
+#include <asio/signal_set.hpp>
 
 
 using namespace Solace;
@@ -51,9 +52,7 @@ private:
 };
 
 
-SignalSet::~SignalSet()
-{
-}
+SignalSet::~SignalSet() = default;
 
 
 SignalSet::SignalSet(EventLoop& ioContext, std::initializer_list<int> signal) :

@@ -11,20 +11,15 @@
  *******************************************************************************/
 #include "cadence/async/eventloop.hpp"
 
-#include <chrono>
 
-#include "asio.hpp"
+#include <asio/io_context.hpp>
 
 
-using namespace Solace;
 using namespace cadence::async;
 
 
 class EventLoop::EventloopImpl {
 public:
-    EventloopImpl():
-        _io_service()
-    {}
 
     bool poll() {
         return _io_service.poll();
@@ -51,26 +46,25 @@ public:
     }
 
     void onForkChild() {
-        _io_service.notify_fork(asio::io_service::fork_event::fork_child);
+        _io_service.notify_fork(asio::io_context::fork_event::fork_child);
     }
 
     void onForkParent() {
-        _io_service.notify_fork(asio::io_service::fork_event::fork_parent);
+        _io_service.notify_fork(asio::io_context::fork_event::fork_parent);
     }
 
-    asio::io_service* getIOService() {
+    asio::io_context* getIOService() {
         return &_io_service;
     }
 
 private:
 
-    asio::io_service _io_service;
+    asio::io_context _io_service;
 };
 
 
-EventLoop::~EventLoop()
-{
-}
+
+EventLoop::~EventLoop() = default;
 
 
 EventLoop::EventLoop() :
@@ -78,14 +72,6 @@ EventLoop::EventLoop() :
 {
 
 }
-
-EventLoop& EventLoop::swap(EventLoop& rhs) noexcept {
-    using std::swap;
-    swap(_pimpl, rhs._pimpl);
-
-    return rhs;
-}
-
 
 bool EventLoop::poll() {
     return _pimpl->poll();

@@ -17,24 +17,26 @@
 #ifndef CADENCE_NETWORKENDPOINT_HPP
 #define CADENCE_NETWORKENDPOINT_HPP
 
+#include "ipendpoint.hpp"
+#include "unixDomainEndpoint.hpp"
 
-#include <solace/traits/iformattable.hpp>  // toString()
+#include <variant>
 
 
 namespace cadence {
 
+using NetworkEndpoint = std::variant<IPEndpoint, UnixEndpoint>;
+
 /**
  * An abstract class to represent network address.
- */
-class NetworkEndpoint :
-        public Solace::IFormattable {
+ *//*
+class NetworkEndpoint {
 public:
-    virtual ~NetworkEndpoint() = default;
 
 
     //!< @see Solace::IFormattable::toString
-    virtual Solace::String toString() const = 0;
-};
+     Solace::String toString() const;
+};*/
 
 }  // End of namespace cadence
 #endif  // CADENCE_NETWORKENDPOINT_HPP

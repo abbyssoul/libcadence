@@ -9,19 +9,24 @@
 /*******************************************************************************
  * @file: async/serialChannel.cpp
  *******************************************************************************/
-#include <cadence/async/serial.hpp>
-#include <solace/exception.hpp>
+#include "cadence/async/serial.hpp"
 
 #include "asio_helper.hpp"
 
+#include <asio/serial_port.hpp>
+#include <asio/read.hpp>
+#include <asio/write.hpp>
+
+#include <solace/exception.hpp>
 
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
 using namespace cadence::async;
 
 
-asio::serial_port_base::parity::type toAsioParity(Serial::Parity parity) {
+asio::serial_port_base::parity::type
+toAsioParity(Serial::Parity parity) {
     switch (parity) {
     case Serial::Parity::even:  return asio::serial_port_base::parity::even;
     case Serial::Parity::odd:   return asio::serial_port_base::parity::odd;
@@ -79,7 +84,7 @@ public:
 
 
     Future<void>
-    asyncRead(ByteBuffer& buffer, size_type bytesToRead) {
+    asyncRead(ByteWriter& buffer, size_type bytesToRead) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -98,11 +103,11 @@ public:
 
 
     Future<void>
-    asyncWrite(ByteBuffer& buffer, size_type bytesToWrite) {
+    asyncWrite(ByteReader& buffer, size_type bytesToWrite) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        _serial.async_read_some(asio_buffer(buffer, bytesToWrite),
+        _serial.async_write_some(asio_buffer(buffer, bytesToWrite),
             [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
                 pm.setError(fromAsioError(error));
@@ -115,7 +120,7 @@ public:
         return f;
     }
 
-    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+    Result<void, Error> read(ByteWriter& dest, size_type bytesToRead) {
         asio::error_code ec;
 
         const auto len = asio::read(_serial, asio_buffer(dest, bytesToRead), ec);
@@ -128,7 +133,7 @@ public:
         return Ok();
     }
 
-    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+    Result<void, Error> write(ByteReader& src, size_type bytesToWrite) {
         asio::error_code ec;
 
         const auto len = asio::write(_serial, asio_buffer(src, bytesToWrite), ec);
@@ -142,14 +147,29 @@ public:
     }
 
 
+    void cancel() {
+        _serial.cancel();
+    }
+
+    void close() {
+        _serial.close();
+    }
+
+    bool isOpen() {
+        return _serial.is_open();
+    }
+
+    bool isClosed() {
+        return !isOpen();
+    }
+
 private:
     asio::serial_port _serial;
 };
 
 
-SerialChannel::~SerialChannel()
-{
-}
+
+SerialChannel::~SerialChannel() = default;
 
 
 SerialChannel::SerialChannel(EventLoop& ioContext, const Path& file,
@@ -186,20 +206,36 @@ SerialChannel::swap(SerialChannel& rhs) noexcept {
 
 
 Future<void>
-SerialChannel::asyncRead(ByteBuffer& buffer, size_type bytesToRead) {
+SerialChannel::asyncRead(ByteWriter& buffer, size_type bytesToRead) {
     return _pimpl->asyncRead(buffer, bytesToRead);
 }
 
 
-Future<void> SerialChannel::asyncWrite(ByteBuffer& buffer, size_type bytesToWrite) {
-    return _pimpl->asyncWrite(buffer, bytesToWrite);
+Future<void> SerialChannel::asyncWrite(ByteReader& src, size_type bytesToWrite) {
+    return _pimpl->asyncWrite(src, bytesToWrite);
 }
 
 
-Result<void, Error> SerialChannel::read(ByteBuffer& dest, size_type bytesToRead) {
+Result<void, Error> SerialChannel::read(ByteWriter& dest, size_type bytesToRead) {
     return _pimpl->read(dest, bytesToRead);
 }
 
-Result<void, Error> SerialChannel::write(ByteBuffer& src, size_type bytesToWrite) {
+Result<void, Error> SerialChannel::write(ByteReader& src, size_type bytesToWrite) {
     return _pimpl->write(src, bytesToWrite);
+}
+
+void SerialChannel::cancel() {
+    _pimpl->cancel();
+}
+
+void SerialChannel::close() {
+    _pimpl->close();
+}
+
+bool SerialChannel::isOpen() {
+    return _pimpl->isOpen();
+}
+
+bool SerialChannel::isClosed() {
+    return _pimpl->isClosed();
 }

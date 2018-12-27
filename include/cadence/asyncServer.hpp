@@ -19,50 +19,45 @@
 
 
 #include "async/eventloop.hpp"
-#include "async/tcpsocket.hpp"
-#include "ipendpoint.hpp"
-#include "serviceNodes.hpp"
+#include "async/streamsocket.hpp"
+#include "async/acceptor.hpp"
 
-#include <solace/path.hpp>
+#include <solace/result.hpp>
+
+#include <functional>  // std::function
 
 
 namespace cadence {
 
 /**
- * Asynchronious data server that server serviceNodes via resource protocol.
+ * Asynchronious data server that server.
  */
 class AsyncServer {
 public:
+    using AcceptHandler = std::function<void(async::StreamSocket&&)>;
 
-    AsyncServer(async::EventLoop& eventLoop, Solace::MemoryManager& memManager);
+    // Non-copible
+    AsyncServer(AsyncServer const&) = delete;
+    AsyncServer& operator= (AsyncServer const&) = delete;
 
-    Solace::Result<void, Solace::Error> configure();
+    // Movable:
+    AsyncServer(AsyncServer&&) noexcept = default;
+    AsyncServer& operator= (AsyncServer&&) = default;
 
-    Solace::Result<void, Solace::Error> startListen(const IPEndpoint& endpoint);
+    template<typename CB>
+    AsyncServer(async::EventLoop& eventLoop, CB&& cb) :
+        _acceptor(eventLoop),
+        _connectionHandler(std::forward<CB>(cb))
+    {}
+
+    Solace::Result<void, Solace::Error> startListen(NetworkEndpoint const& endpoint);
+
     void stop();
-
-    Solace::Result<void, Solace::Error> mount(const Solace::Path& path, std::shared_ptr<Node>&& r);
-
-protected:
-
-    void doAccept();
-
-    class Session;
-    std::shared_ptr<Session> spawnSession();
 
 private:
 
-    /// Memory manager used to allocate memory for new sessions.
-    Solace::MemoryManager&          _memManager;
-
-    async::TcpAcceptor     _acceptor;
-    async::TcpSocket       _socket;
-
-    /// A resource being server by the server
-    /// std::unique_ptr<AuthHandler>    _authHandler;
-
-    /// Root directory of the server where all other nodes are mounted to.
-    DirectoryNode        _root;
+    async::Acceptor _acceptor;
+    AcceptHandler   _connectionHandler;
 };
 
 }  // End of namespace cadence

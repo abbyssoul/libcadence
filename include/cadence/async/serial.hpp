@@ -18,24 +18,24 @@
 #define CADENCE_ASYNC_SERIAL_HPP
 
 #include "cadence/async/channel.hpp"
-
-#include <solace/io/serial.hpp>
+#include "cadence/io/serial.hpp"
 
 
 namespace cadence { namespace async {
 
-class SerialChannel : public Channel {
+class SerialChannel :
+        public Channel {
 public:
 
-    ~SerialChannel();
+    ~SerialChannel() override;
 
     SerialChannel(EventLoop& ioContext,
-           const Solace::Path& file,
+           Solace::Path const& file,
            Solace::uint32 baudrate = 9600,
-           Solace::IO::Serial::Bytesize bytesize = Solace::IO::Serial::Bytesize::eightbits,
-           Solace::IO::Serial::Parity parity = Solace::IO::Serial::Parity::none,
-           Solace::IO::Serial::Stopbits stopbits = Solace::IO::Serial::Stopbits::one,
-           Solace::IO::Serial::Flowcontrol flowcontrol = Solace::IO::Serial::Flowcontrol::none);
+           Serial::Bytesize bytesize = Serial::Bytesize::eightbits,
+           Serial::Parity parity = Serial::Parity::none,
+           Serial::Stopbits stopbits = Serial::Stopbits::one,
+           Serial::Flowcontrol flowcontrol = Serial::Flowcontrol::none);
 
     SerialChannel(const SerialChannel& rhs) = delete;
     SerialChannel& operator= (const SerialChannel& rhs) = delete;
@@ -50,6 +50,8 @@ public:
 
     using Channel::asyncRead;
     using Channel::asyncWrite;
+    using Channel::read;
+    using Channel::write;
 
 	/**
 	 * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -60,7 +62,7 @@ public:
 	 *
 	 * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
 	 */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+    Solace::Future<void> asyncRead(Solace::ByteWriter& dest, size_type bytesToRead) override;
 
 	/**
 	 * Post an async write request to write specified amount of data into this IO object.
@@ -71,14 +73,28 @@ public:
 	 *
 	 * @note If the provided source buffer does not have requested amount of data - an exception is raised.
 	 */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+    Solace::Future<void> asyncWrite(Solace::ByteReader& src, size_type bytesToWrite) override;
 
 
     /** @see Channel::read */
-    Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+    Solace::Result<void, Solace::Error> read(Solace::ByteWriter& dest, size_type bytesToRead) override;
 
     /** @see Channel::write */
-    Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+    Solace::Result<void, Solace::Error> write(Solace::ByteReader& src, size_type bytesToWrite) override;
+
+
+    /** @see Channel::cancel */
+    void cancel() override;
+
+    /** @see Channel::close */
+    void close() override;
+
+    /** @see Channel::isOpen */
+    bool isOpen() override;
+
+    /** @see Channel::isClosed */
+    bool isClosed() override;
+
 
 private:
 

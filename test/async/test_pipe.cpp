@@ -15,6 +15,8 @@
  *******************************************************************************/
 #include <cadence/async/pipe.hpp>  // Class being tested
 
+#include <solace/output_utils.hpp>
+
 #include "gtest/gtest.h"
 
 
@@ -26,8 +28,8 @@ TEST(TestAsyncPipe, testAsyncWrite) {
     Pipe iopipe(iocontext);
 
     char message[] = "Hello there!";
-    const ByteBuffer::size_type messageLen = strlen(message) + 1;
-    auto buffer = ByteBuffer(wrapMemory(message));
+    auto const messageLen = strlen(message) + 1;
+    auto buffer = ByteReader(wrapMemory(message));
 
     bool writeComplete = false;
 
@@ -47,11 +49,11 @@ TEST(TestAsyncPipe, testAsyncRead) {
     Pipe iopipe(iocontext);
 
     char message[] = "Hello there!";
-    const ByteBuffer::size_type messageLen = strlen(message) + 1;
-    auto messageBuffer = ByteBuffer(wrapMemory(message));
+    auto const messageLen = strlen(message) + 1;
+    auto messageBuffer = ByteReader(wrapMemory(message));
 
     char rcv_buffer[128];
-    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    auto readBuffer = ByteWriter(wrapMemory(rcv_buffer));
 
     bool readComplete = false;
     bool writeComplete = false;
@@ -81,16 +83,16 @@ TEST(TestAsyncPipe, testAsyncReadWrite) {
     Pipe iopipe(iocontext);
 
     char message[] = "Hello there!";
-    const ByteBuffer::size_type messageLen = strlen(message) + 1;
-    auto messageBuffer = ByteBuffer(wrapMemory(message));
+    auto const messageLen = strlen(message) + 1;
+    auto messageBuffer = ByteReader(wrapMemory(message));
 
     char rcv_buffer[128];
-    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    auto readBuffer = ByteWriter(wrapMemory(rcv_buffer));
 
     bool readComplete = false;
     bool writeComplete = false;
 
-    iopipe.asyncRead(readBuffer).then([&readComplete, &iocontext]() {
+    iopipe.asyncRead(readBuffer).then([&readComplete]() {
         readComplete = true;
     });
 

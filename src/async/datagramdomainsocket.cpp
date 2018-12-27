@@ -9,10 +9,11 @@
 /*******************************************************************************
  * @file: async/DatagramDomainSocket.cpp
 *******************************************************************************/
-#include <cadence/async/datagramdomainsocket.hpp>
+#include "cadence/async/datagramdomainsocket.hpp"
 
 
 #include "asio_helper.hpp"
+#include "asio_helper_local.hpp"
 
 
 using namespace Solace;
@@ -33,7 +34,7 @@ public:
     {}
 
 
-    Future<void> asyncConnect(const NetworkEndpoint& peer) {
+    Future<void> asyncConnect(UnixEndpoint const& peer) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -51,7 +52,7 @@ public:
     }
 
     Future<void>
-    asyncRead(ByteBuffer& dest, std::size_t bytesToRead) {
+    asyncRead(ByteWriter& dest, std::size_t bytesToRead) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -70,7 +71,7 @@ public:
 
 
     Future<void>
-    asyncReadFrom(ByteBuffer& dest, std::size_t bytesToRead, const NetworkEndpoint& endpoint) {
+    asyncReadFrom(ByteWriter& dest, std::size_t bytesToRead, UnixEndpoint const& endpoint) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -90,7 +91,7 @@ public:
 
 
     Future<void>
-    asyncWrite(ByteBuffer& src, std::size_t bytesToWrite) {
+    asyncWrite(ByteReader& src, std::size_t bytesToWrite) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -109,7 +110,7 @@ public:
 
 
     Future<void>
-    asyncWriteTo(ByteBuffer& src, std::size_t bytesToWrite, const NetworkEndpoint& endpoint) {
+    asyncWriteTo(ByteReader& src, std::size_t bytesToWrite, UnixEndpoint const& endpoint) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -128,7 +129,7 @@ public:
     }
 
 
-    Result<void, Error> connect(const NetworkEndpoint& endpoint) {
+    Result<void, Error> connect(UnixEndpoint const& endpoint) {
         asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
         asio::error_code ec;
 
@@ -140,7 +141,7 @@ public:
         return Ok();
     }
 
-    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+    Result<void, Error> read(ByteWriter& dest, size_type bytesToRead) {
         asio::error_code ec;
 
         const auto len = _socket.receive(asio_buffer(dest, bytesToRead), 0, ec);
@@ -153,7 +154,7 @@ public:
         return Ok();
     }
 
-    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+    Result<void, Error> write(ByteReader& src, size_type bytesToWrite) {
         asio::error_code ec;
 
         const auto len = _socket.send(asio_buffer(src, bytesToWrite), 0, ec);
@@ -199,9 +200,7 @@ private:
 
 
 
-DatagramDomainSocket::~DatagramDomainSocket()
-{
-}
+DatagramDomainSocket::~DatagramDomainSocket() = default;
 
 
 DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext) :
@@ -211,7 +210,7 @@ DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext) :
 }
 
 
-DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext, const NetworkEndpoint& endpoint) :
+DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext, const UnixEndpoint& endpoint) :
     Channel(ioContext),
     _pimpl(std::make_unique<SocketImpl>(ioContext.getIOService(), endpoint.toString()))
 {
@@ -235,27 +234,27 @@ DatagramDomainSocket& DatagramDomainSocket::swap(DatagramDomainSocket& rhs) noex
 
 
 
-Future<void> DatagramDomainSocket::asyncConnect(const NetworkEndpoint& endpoint) {
+Future<void> DatagramDomainSocket::asyncConnect(UnixEndpoint const& endpoint) {
     return _pimpl->asyncConnect(endpoint);
 }
 
 Future<void>
-DatagramDomainSocket::asyncRead(ByteBuffer& dest, size_type bytesToRead) {
+DatagramDomainSocket::asyncRead(ByteWriter& dest, size_type bytesToRead) {
     return _pimpl->asyncRead(dest, bytesToRead);
 }
 
 Future<void>
-DatagramDomainSocket::asyncReadFrom(ByteBuffer& dest, std::size_t bytesToRead, const NetworkEndpoint& endpoint) {
+DatagramDomainSocket::asyncReadFrom(ByteWriter& dest, std::size_t bytesToRead, UnixEndpoint const& endpoint) {
     return _pimpl->asyncReadFrom(dest, bytesToRead, endpoint);
 }
 
 Future<void>
-DatagramDomainSocket::asyncWrite(ByteBuffer& src, size_type bytesToWrite)  {
+DatagramDomainSocket::asyncWrite(ByteReader& src, size_type bytesToWrite)  {
     return _pimpl->asyncWrite(src, bytesToWrite);
 }
 
 Future<void>
-DatagramDomainSocket::asyncWriteTo(ByteBuffer& src, std::size_t bytesToWrite, const NetworkEndpoint& endpoint) {
+DatagramDomainSocket::asyncWriteTo(ByteReader& src, std::size_t bytesToWrite, UnixEndpoint const& endpoint) {
     return _pimpl->asyncWriteTo(src, bytesToWrite, endpoint);
 }
 
@@ -267,15 +266,15 @@ void DatagramDomainSocket::close() {
     _pimpl->close();
 }
 
-void DatagramDomainSocket::connect(const NetworkEndpoint& endpoint) {
+void DatagramDomainSocket::connect(UnixEndpoint const& endpoint) {
     _pimpl->connect(endpoint);
 }
 
-Result<void, Error> DatagramDomainSocket::read(ByteBuffer& dest, size_type bytesToRead) {
+Result<void, Error> DatagramDomainSocket::read(ByteWriter& dest, size_type bytesToRead) {
     return _pimpl->read(dest, bytesToRead);
 }
 
-Result<void, Error> DatagramDomainSocket::write(ByteBuffer& src, size_type bytesToWrite) {
+Result<void, Error> DatagramDomainSocket::write(ByteReader& src, size_type bytesToWrite) {
     return _pimpl->write(src, bytesToWrite);
 }
 

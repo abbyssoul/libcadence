@@ -15,9 +15,10 @@
  *******************************************************************************/
 #include <cadence/async/udpsocket.hpp>  // Class being tested
 
+#include <solace/output_utils.hpp>
+
 #include "gtest/gtest.h"
 
-#include <unistd.h>
 
 using namespace Solace;
 using namespace cadence;
@@ -26,29 +27,38 @@ using namespace cadence::async;
 
 TEST(TestUdpSocket, testAsyncReadWrite) {
     EventLoop iocontext;
-    UdpSocket udpServerSocket(iocontext, 20000);
-    UdpSocket udpClientSocket(iocontext, 20001);
 
-    char message[] = "Hello there!";
-    const ByteBuffer::size_type messageLen = strlen(message) + 1;
-
-    auto messageBuffer = ByteBuffer(wrapMemory(message));
+    char const message[] = "Hello there!";
+    auto messageBuffer = ByteReader(wrapMemory(message));
+    auto const messageLen = messageBuffer.limit();
 
     char rcv_buffer[128];
-    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    auto readBuffer = ByteWriter(wrapMemory(rcv_buffer));
 
     bool readComplete = false;
     bool writeComplete = false;
 
-    IPEndpoint receiver("127.0.0.1", 20000);
+    auto udpServer = UdpSocket(iocontext, 20000);
+    ASSERT_TRUE(udpServer.isOpen());
+    udpServer.asyncReadFrom(readBuffer)
+            .then([&readComplete](IPEndpoint&&) {
+                readComplete = true;
+            })
+            .onError([](Error&& e) {
+                FAIL() << e.toString();
+            });
 
-    udpServerSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
-        readComplete = true;
-    });
 
-    udpClientSocket.asyncWriteTo(messageBuffer, receiver).then([&writeComplete]() {
-        writeComplete = true;
-    });
+    auto udpClient = UdpSocket{iocontext};
+    ASSERT_TRUE(udpClient.isOpen());
+    auto const destAddr = udpServer.getLocalEndpoint();
+    udpClient.asyncWriteTo(destAddr, messageBuffer)
+            .then([&writeComplete]() {
+                writeComplete = true;
+            })
+            .onError([](Error&& e) {
+                FAIL() << e.toString();
+            });
 
     iocontext.runFor(300);
 

@@ -13,7 +13,10 @@
  *
  * Created on: 10/10/2016
  *******************************************************************************/
-#include <cadence/async/streamdomainsocket.hpp>  // Class being tested
+#include <cadence/async/streamsocket.hpp>  // Class being tested
+#include <cadence/async/acceptor.hpp>
+
+#include <solace/output_utils.hpp>
 
 #include "gtest/gtest.h"
 
@@ -43,31 +46,33 @@ protected:
 TEST_F(TestStreamDomainSocket, testAsyncReadWrite) {
     UnixEndpoint endpoint(testSocketName);
 
-    StreamDomainAcceptor acceptor(iocontext, endpoint);
-    StreamDomainSocket ioStreamServerSocket(iocontext);
-    StreamDomainSocket ioStreamClientSocket(iocontext);
+    Acceptor acceptor(iocontext);
+    auto ioStreamClientSocket = createUnixSocket(iocontext);
 
     bool connectionAccepted = false;
     char message[] = "Hello there!";
-    const ByteBuffer::size_type messageLen = strlen(message) + 1;
-    auto messageBuffer = ByteBuffer(wrapMemory(message));
+    auto const messageLen = strlen(message) + 1;
+    auto messageBuffer = ByteReader(wrapMemory(message));
 
     char rcv_buffer[128];
-    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    auto readBuffer = ByteWriter(wrapMemory(rcv_buffer));
 
     bool readComplete = false;
     bool writeComplete = false;
 
-    acceptor.asyncAccept(ioStreamServerSocket)
-            .then([&connectionAccepted, &ioStreamServerSocket, &readBuffer, &messageLen, &readComplete]() {
-        connectionAccepted = true;
+    ASSERT_TRUE(acceptor.open(endpoint));
 
-        ioStreamServerSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
-            readComplete = true;
-        });
-    });
+    acceptor.asyncAccept()
+            .then([&](StreamSocket&& peer) {
+                connectionAccepted = true;
 
-    ioStreamClientSocket.connect(endpoint);
+                peer.asyncRead(readBuffer, messageLen).then([&readComplete]() {
+                    readComplete = true;
+                });
+            });
+
+    ASSERT_TRUE(ioStreamClientSocket.connect(endpoint));
+
     ioStreamClientSocket.asyncWrite(messageBuffer).then([&writeComplete]() {
         writeComplete = true;
     });

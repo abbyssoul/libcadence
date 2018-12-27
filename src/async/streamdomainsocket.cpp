@@ -8,64 +8,53 @@
 */
 /*******************************************************************************
  * @file: async/StreamDomainSocket.cpp
-*******************************************************************************/
-#include <cadence/async/streamdomainsocket.hpp>
+ *******************************************************************************/
+#include "cadence/async/streamsocket.hpp"
 
+#include "streamsocket_impl.hpp"
 #include "asio_helper.hpp"
+#include "asio_helper_local.hpp"
+
+#include <asio/write.hpp>
+#include <asio/read.hpp>
 
 
 using namespace Solace;
+using namespace cadence;
 using namespace cadence::async;
 
 
-class StreamDomainSocket::StreamDomainSocketImpl {
+namespace {
+// Anounimous namespace
+
+class StreamDomainSocketImpl :
+        public StreamSocket::StreamSocketImpl {
 public:
+
+    using size_type = StreamSocket::size_type;
+    using Socket_type = asio::local::stream_protocol::socket;
+
 
     StreamDomainSocketImpl(void* ioservice) :
         _socket(asAsioService(ioservice))
+    {}
+
+    StreamDomainSocketImpl(Socket_type&& other) :
+        _socket(std::move(other))
     {}
 
     StreamDomainSocketImpl(StreamDomainSocketImpl&& other) :
         _socket(std::move(other._socket))
     {}
 
-    Result<void, Error> connect(const String& server) {
-        asio::error_code ec;
-
-        _socket.connect(asio::local::stream_protocol::endpoint(server.c_str()), ec);
-        if (ec) {
-            return Err(fromAsioError(ec));
-        }
-
-        return Ok();
-    }
-
-
-    Future<void> asyncConnect(const String& endpoint) {
-        Promise<void> promise;
-        auto f = promise.getFuture();
-
-        asio::local::stream_protocol::endpoint dest(endpoint.to_str());
-
-        _socket.async_connect(dest, [pm = std::move(promise)] (const asio::error_code& error) mutable {
-            if (error) {
-                pm.setError(fromAsioError(error));
-            } else {
-                pm.setValue();
-            }
-        });
-
-        return f;
-    }
-
 
     Future<void>
-    asyncRead(ByteBuffer& dest, std::size_t bytesToRead) {
+    asyncRead(ByteWriter& dest, size_type bytesToRead) override {
         Promise<void> promise;
         auto f = promise.getFuture();
 
         asio::async_read(_socket, asio_buffer(dest, bytesToRead),
-            [pm = std::move(promise), &dest] (const asio::error_code& error, std::size_t bytes_transferred) mutable {
+            [pm = std::move(promise), &dest] (asio::error_code const& error, std::size_t bytes_transferred) mutable {
                 dest.advance(bytes_transferred);
                 if (error) {
                     pm.setError(fromAsioError(error));
@@ -79,12 +68,12 @@ public:
 
 
     Future<void>
-    asyncWrite(ByteBuffer& src, std::size_t bytesToWrite) {
+    asyncWrite(ByteReader& src, size_type bytesToWrite) override {
         Promise<void> promise;
         auto f = promise.getFuture();
 
         asio::async_write(_socket, asio_buffer(src, bytesToWrite),
-            [pm = std::move(promise), &src] (const asio::error_code& error, std::size_t bytes_transferred) mutable {
+            [pm = std::move(promise), &src] (asio::error_code const& error, std::size_t bytes_transferred) mutable {
                 src.advance(bytes_transferred);
                 if (error) {
                     pm.setError(fromAsioError(error));
@@ -96,10 +85,11 @@ public:
         return f;
     }
 
-    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+    Result<void, Error>
+    read(ByteWriter& dest, size_type bytesToRead) override {
         asio::error_code ec;
 
-        const auto len = asio::read(_socket, asio_buffer(dest, bytesToRead), ec);
+         auto const len = asio::read(_socket, asio_buffer(dest, bytesToRead), ec);
         if (ec) {
             return Err(fromAsioError(ec));
         } else {
@@ -109,10 +99,11 @@ public:
         return Ok();
     }
 
-    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+    Result<void, Error>
+    write(ByteReader& src, size_type bytesToWrite) override {
         asio::error_code ec;
 
-        const auto len = asio::write(_socket, asio_buffer(src, bytesToWrite), ec);
+         auto const len = asio::write(_socket, asio_buffer(src, bytesToWrite), ec);
         if (ec) {
             return Err(fromAsioError(ec));
         } else {
@@ -122,86 +113,48 @@ public:
         return Ok();
     }
 
-    asio::local::stream_protocol::socket& getSocket() noexcept { return _socket; }
 
-private:
-    asio::local::stream_protocol::socket _socket;
-};
-
-
-StreamDomainSocket::~StreamDomainSocket()
-{
-
-}
-
-StreamDomainSocket::StreamDomainSocket(EventLoop& ioContext) :
-    StreamSocket(ioContext),
-    _pimpl(std::make_unique<StreamDomainSocketImpl>(ioContext.getIOService()))
-{
-}
-
-StreamDomainSocket::StreamDomainSocket(StreamDomainSocket&& rhs) :
-    StreamSocket(std::move(rhs)),
-    _pimpl(std::make_unique<StreamDomainSocketImpl>(std::move(*rhs._pimpl.get())))
-{
-}
-
-
-StreamDomainSocket& StreamDomainSocket::swap(StreamDomainSocket& rhs) noexcept {
-    using std::swap;
-    swap(_pimpl, rhs._pimpl);
-
-    return *this;
-}
-
-
-Result<void, Error> StreamDomainSocket::connect(const NetworkEndpoint& endpoint) {
-    return _pimpl->connect(endpoint.toString());
-}
-
-
-Result<void, Error> StreamDomainSocket::read(ByteBuffer& dest, size_type bytesToRead) {
-    return _pimpl->read(dest, bytesToRead);
-}
-
-
-Result<void, Error> StreamDomainSocket::write(ByteBuffer& src, size_type bytesToWrite) {
-    return _pimpl->write(src, bytesToWrite);
-}
-
-
-Future<void>
-StreamDomainSocket::asyncConnect(const NetworkEndpoint& endpoint) {
-    return _pimpl->asyncConnect(endpoint.toString());
-}
-
-
-Future<void>
-StreamDomainSocket::asyncRead(ByteBuffer& dest, size_type bytesToRead) {
-    return _pimpl->asyncRead(dest, bytesToRead);
-}
-
-
-Future<void>
-StreamDomainSocket::asyncWrite(ByteBuffer& src, size_type bytesToWrite) {
-    return _pimpl->asyncWrite(src, bytesToWrite);
-}
-
-
-
-class StreamDomainAcceptor::AcceptorImpl {
-public:
-
-    AcceptorImpl(void* ioservice, const String& file) :
-        _acceptor(asAsioService(ioservice), asio::local::stream_protocol::endpoint(file.to_str()))
-    {
+    void cancel() override {
+        _socket.cancel();
     }
 
-    Future<void> asyncAccept(StreamDomainSocket::StreamDomainSocketImpl* socket) {
+    void close() override {
+        _socket.close();
+    }
+
+    bool isOpen() override {
+        return _socket.is_open();
+    }
+
+    bool isClosed() override {
+        return !_socket.is_open();
+    }
+
+    NetworkEndpoint getLocalEndpoint() const override {
+        return fromAsioEndpoint(_socket.local_endpoint());
+    }
+
+    NetworkEndpoint getRemoteEndpoint() const override {
+        return fromAsioEndpoint(_socket.remote_endpoint());
+    }
+
+    void shutdown() override {
+        _socket.shutdown(asio::local::stream_protocol::socket::shutdown_both);
+    }
+
+    Future<void>
+    asyncConnect(NetworkEndpoint const& endpoint) override {
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        _acceptor.async_accept(socket->getSocket(), [pm = std::move(promise)](const asio::error_code& error) mutable {
+        asio::error_code ec;
+        auto const asioEndpoint = toAsioLocalEndpoint(endpoint, ec);
+        if (ec) {
+            promise.setError(fromAsioError(ec));
+            return f;
+        }
+
+        _socket.async_connect(asioEndpoint, [pm = std::move(promise)] (asio::error_code const& error) mutable {
             if (error) {
                 pm.setError(fromAsioError(error));
             } else {
@@ -212,22 +165,41 @@ public:
         return f;
     }
 
+    Result<void, Error>
+    connect(NetworkEndpoint const& endpoint) override {
+        asio::error_code ec;
+
+        auto const asioEndpoint = toAsioLocalEndpoint(endpoint, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        _socket.connect(asioEndpoint, ec);
+        if (ec) {
+            return Err(fromAsioError(ec));
+        }
+
+        return Ok();
+    }
+
+
+    auto& getSocket() noexcept { return _socket; }
+
 private:
-    asio::local::stream_protocol::acceptor _acceptor;
+
+    asio::local::stream_protocol::socket _socket;
+
 };
 
-StreamDomainAcceptor::~StreamDomainAcceptor()
-{
+}  // namespace
+
+
+StreamSocket
+cadence::async::createUnixSocket(EventLoop& loop) {
+    return { loop, std::make_unique<StreamDomainSocketImpl>(loop.getIOService()) };
 }
 
-
-StreamDomainAcceptor::StreamDomainAcceptor(EventLoop& ioContext, const UnixEndpoint& endpoint) :
-    _pimpl(std::make_unique<AcceptorImpl>(ioContext.getIOService(), endpoint.toString().to_str()))
-{
-}
-
-
-Future<void>
-StreamDomainAcceptor::asyncAccept(StreamDomainSocket& socket) {
-    return _pimpl->asyncAccept(socket._pimpl.get());
+StreamSocket
+createUnixSocket(EventLoop& loop, asio::local::stream_protocol::socket&& socket) {
+    return { loop, std::make_unique<StreamDomainSocketImpl>(std::move(socket)) };
 }

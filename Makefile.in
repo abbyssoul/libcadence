@@ -1,8 +1,6 @@
 # Project name
 export PROJECT = cadence
 
-# Compiler config:
-CXX ?= g++
 RANLIB ?= /bin/true
 
 ifeq (clang++, $(findstring clang++,$(CXX)))
@@ -24,8 +22,6 @@ export TARGET = $(TARGET_DIR)/$(TARGET_NAME)
 export PUBLIC_HEADERS = include
 export BUILD_DIR = build
 SRC_DIR = src
-GEN_SRC_DIR = $(SRC_DIR)/generated
-SRC_PROTO_DIR = $(SRC_DIR)/proto
 
 # Google test framework:
 GTEST_LIB = gtest
@@ -38,22 +34,21 @@ TEST_NAME = test_$(PROJECT)
 TEST_TARGET_DIR = $(BUILD_DIR)/bin
 TEST_TAGRET = $(TEST_TARGET_DIR)/$(TEST_NAME)
 
+DOC_DIR = docs
+DOC_TARGET_HTML = $(DOC_DIR)/html
+
+
 export EXAMPLES_SRC_DIR = examples
 
 
 src = $(wildcard $(SRC_DIR)/*.cpp) \
+	  $(wildcard $(SRC_DIR)/io/*.cpp) \
 	  $(wildcard $(SRC_DIR)/async/*.cpp) \
-	  $(wildcard $(SRC_DIR)/protocols/*.cpp)
-
-proto = $(wildcard $(SRC_PROTO_DIR)/*.capnp)
 
 test_src =	$(wildcard $(TEST_SRC_DIR)/*.cpp) \
 			$(wildcard $(TEST_SRC_DIR)/ci/*.cpp) \
-			$(wildcard $(TEST_SRC_DIR)/protocols/*.cpp) \
+			$(wildcard $(TEST_SRC_DIR)/io/*.cpp) \
 			$(wildcard $(TEST_SRC_DIR)/async/*.cpp)
-
-generated_proto = $(proto:.capnp=.capnp.c++)
-generated_src = $(patsubst $(SRC_PROTO_DIR)%,$(GEN_SRC_DIR)%,$(generated_proto))
 
 
 obj = $(addprefix $(BUILD_DIR)/, $(src:.cpp=.o))
@@ -61,7 +56,7 @@ test_obj = $(addprefix $(BUILD_DIR)/, $(test_src:.cpp=.o))
 dep = $(obj:.o=.d)  # one dependency file for each source
 
 
-CXXFLAGS += -std=c++14 -pipe -ftemplate-depth=128
+CXXFLAGS += -std=c++17 -pipe -ftemplate-depth=128
 CXXFLAGS += -pedantic -Wall -Wextra -Wabi -Wfloat-equal \
 -Wshadow -Wno-missing-field-initializers -Wno-missing-braces \
 -Wcast-qual -Wno-sign-compare -Wno-multichar
@@ -70,13 +65,13 @@ CXXFLAGS += -pedantic -Wall -Wextra -Wabi -Wfloat-equal \
 # FIXME: Can't use -D_GLIBCXX_DEBUG until libsolace use it, subject to move from CppUnit to GTest
 ifdef dbg
 	CXXFLAGS += -O0 -ggdb3 -DDEBUG -D _DEBUG
-	CXXFLAGS += -fstack-protector-all -fsanitize=address,undefined,leak -fno-omit-frame-pointer
+	CXXFLAGS += -fstack-protector-all -fno-omit-frame-pointer
 	# FIXME: Doesn't work ????	CXXFLAGS += -fvtable-verify=std
-	CXXFLAGS += -fsanitize-address-use-after-scope
 else # Release optimizations
 	CXXFLAGS += -Ofast -flto
 	CXXFLAGS += -fstack-protector-strong
 	CXXFLAGS += -march=native -mtune=native
+	LDFLAGS += -flto
 endif
 
 
@@ -89,13 +84,15 @@ CPPFLAGS += -isystem external/asio/asio/include \
 LDFLAGS +=  -L$(TARGET_DIR) \
 			-L../libsolace/build/src
 
-LDLIBS += -l$(PROJECT) -lsolace -pthread
-ifdef dbg
-	LDLIBS += -fsanitize=address -llsan -lubsan
+LDLIBS += -l$(PROJECT) -lsolace
+
+ifdef sanitize
+	CXXFLAGS += -fsanitize=$(sanitize),signed-integer-overflow -fsanitize-address-use-after-scope
+	LDLIBS += -fsanitize=$(sanitize) -llsan -lubsan
 endif
 
 test_CPPFLAGS += -isystem ${GTEST_DIR}/include
-test_LDLIBS += -L$(BUILD_DIR)/lib -l$(GTEST_LIB)
+test_LDLIBS += -L$(BUILD_DIR)/lib -l$(GTEST_LIB) -pthread
 
 
 # Export compiler options and extra libs for examples and tests
@@ -108,8 +105,6 @@ export LDLIBS
 $(PROJECT): $(TARGET)
 all: $(PROJECT) $(TEST_TAGRET) examples
 
-.PHONY: gen_proto
-gen_proto: $(GEN_SRC_DIR) $(generated_src)
 
 #-------------------------------------------------------------------------------
 # Build the project
@@ -119,21 +114,6 @@ $(BUILD_DIR):
 
 $(TARGET_DIR):
 	mkdir -p $@
-
-$(GEN_SRC_DIR):
-	mkdir -p $@
-
-
-$(generated_src): $(GEN_SRC_DIR)
-$(generated_src): $(proto)
-
-$(GEN_SRC_DIR)/%.capnp.c++: $(SRC_PROTO_DIR)/%.capnp
-	capnp compile -oc++:$(GEN_SRC_DIR) --src-prefix=$(SRC_DIR)/proto -I/usr/include/ $<
-
-$(GEN_SRC_DIR)/%.capnp.h++: $(SRC_PROTO_DIR)/%.capnp
-	capnp compile -oc++:$(GEN_SRC_DIR) --src-prefix=$(SRC_DIR)/proto -I/usr/include/ $<
-
-$(src): $(generated_src)
 
 
 $(BUILD_DIR)/%.o: %.cpp
@@ -180,10 +160,12 @@ $(TEST_TAGRET): $(TARGET) $(TEST_TARGET_DIR) $(GTEST_TARGET)
 $(TEST_TAGRET): $(test_obj)
 	$(CXX) -o $@ $(CXXFLAGS) $(test_obj) $(LDFLAGS) $(LDLIBS) $(test_LDLIBS)
 
-test: $(TEST_TAGRET)
-	./$(TEST_TAGRET)
+tests: $(TEST_TAGRET)
 
+# Do the actual testing
 .PHONY: test
+test: tests
+	./$(TEST_TAGRET)
 
 
 #-------------------------------------------------------------------------------
@@ -201,11 +183,11 @@ $(BUILD_DIR)/%.d: %.cpp
 #-------------------------------------------------------------------------------
 # Build docxygen documentation
 #-------------------------------------------------------------------------------
-$(DOC_TARGET):
-	doxygen doc/Doxyfile
+$(DOC_TARGET_HTML):
+	doxygen $(DOC_DIR)/Doxyfile
 
 # Build project doxygen docs doxyfile.inc
-doc: $(MODULE_HEADERS) $(MODULE_SRC) $(DOC_TARGET)
+doc: $(MODULE_HEADERS) $(MODULE_SRC) $(DOC_TARGET_HTML)
 
 
 #-------------------------------------------------------------------------------
@@ -246,7 +228,7 @@ debian-clean:
 
 .PHONY: clean
 clean:
-	$(RM) -rf $(TARGET_DIR) $(BUILD_DIR) $(DOC_TARGET) $(GEN_SRC_DIR)
+	$(RM) -rf $(TARGET_DIR) $(BUILD_DIR) $(DOC_TARGET_HTML)
 
 #-------------------------------------------------------------------------------
 # Code Quality Assurance
@@ -255,16 +237,9 @@ tools/cppcheck:
 	# Get the latest cppcheck
 	git clone --depth 1 https://github.com/danmar/cppcheck.git tools/cppcheck
 
-tools/FlintPlusPlus:
-	git clone --depth 1 https://github.com/L2Program/FlintPlusPlus.git tools/FlintPlusPlus
-
 tools/cppcheck/cppcheck: tools/cppcheck
 	git -C tools/cppcheck pull
 	$(MAKE) -j2 -C tools/cppcheck cppcheck
-
-tools/FlintPlusPlus/flint/flint++: tools/FlintPlusPlus
-	git -C tools/FlintPlusPlus pull
-	$(MAKE) -j2 -C tools/FlintPlusPlus/flint
 
 cpplint: $(MODULE_HEADERS) $(MODULE_SRC)
 	cpplint --recursive --exclude=${TEST_SRC_DIR}/ci/* ${PUBLIC_HEADERS} ${SRC_DIR} ${TEST_SRC_DIR} $(EXAMPLES_SRC_DIR)
@@ -274,9 +249,6 @@ cppcheck: $(MODULE_HEADERS) $(MODULE_SRC) tools/cppcheck/cppcheck
 	--enable=warning,performance,portability,missingInclude,information,unusedFunction \
 	-I include -i test/ci ${SRC_DIR} ${TEST_SRC_DIR} $(EXAMPLES_SRC_DIR)
 
-flint: $(MODULE_HEADERS) $(MODULE_SRC) tools/FlintPlusPlus/flint/flint++
-	tools/FlintPlusPlus/flint/flint++ -v -r ${SRC_DIR} ${TEST_SRC_DIR} $(EXAMPLES_SRC_DIR)
-
 scan-build: ANALYZE_MAKE
 	cd $(ANALYZE_DIR) && scan-build $(MAKE)
 
@@ -285,9 +257,8 @@ tidy:
 	${SRC_DIR}/*.cpp -- -I$(PUBLIC_HEADERS) -std=c++14
 
 
-
-codecheck: cpplint flint cppcheck #scan-build
-
+.PHONY: clean
+codecheck: cpplint cppcheck #scan-build
 
 
 #-------------------------------------------------------------------------------

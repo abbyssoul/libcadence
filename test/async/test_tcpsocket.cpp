@@ -13,7 +13,11 @@
  *
  * Created on: 10/10/2016
  *******************************************************************************/
-#include <cadence/async/tcpsocket.hpp>  // Class being tested
+#include <cadence/async/streamsocket.hpp>  // Class being tested
+#include <cadence/async/acceptor.hpp>
+
+
+#include <solace/output_utils.hpp>
 
 #include "gtest/gtest.h"
 
@@ -25,26 +29,29 @@ using namespace Solace;
 using namespace cadence;
 using namespace cadence::async;
 
+IPEndpoint anyIPEndpoint() {
+    return IPEndpoint{IPAddress::any(), 0};
+}
 
 TEST(TestTcpSocket, testAsyncConnect) {
     EventLoop iocontext;
 
-    TcpSocket serverSocket(iocontext);
     bool connectionEstablished = false;
     bool connectionAccepted = false;
 
-    TcpAcceptor acceptor(iocontext, 0);
-    acceptor.asyncAccept(serverSocket)
-            .then([&connectionAccepted]() {
+    Acceptor acceptor(iocontext);
+    ASSERT_TRUE(acceptor.open(anyIPEndpoint()).isOk());
+
+    acceptor.asyncAccept()
+            .then([&connectionAccepted](StreamSocket&& ) {
                 connectionAccepted = true;
             }).onError([&connectionAccepted](Error&& e) {
                 connectionAccepted = false;
                 FAIL() << e.toString();
             });
 
-    const IPEndpoint endpoint {"127.0.0.1", acceptor.getLocalEndpoint().getPort()};
-    TcpSocket clientSocket(iocontext);
-    clientSocket.asyncConnect(endpoint)
+    auto clientSocket = createTCPSocket(iocontext);
+    clientSocket.asyncConnect(acceptor.getLocalEndpoint())
             .then([&connectionEstablished]() {
                 connectionEstablished = true;
             }).onError([&connectionEstablished](Error&& e) {
@@ -63,13 +70,14 @@ TEST(TestTcpSocket, testAsyncConnect) {
 TEST(TestTcpSocket, testAsyncAcceptSyncConnect) {
     EventLoop iocontext;
 
-    TcpSocket serverSocket(iocontext);
     std::atomic_bool connectionEstablished { false };
     std::atomic_bool connectionAccepted { false };
 
-    TcpAcceptor acceptor(iocontext, 0);
-    acceptor.asyncAccept(serverSocket)
-            .then([&connectionAccepted]() {
+    Acceptor acceptor(iocontext);
+    ASSERT_TRUE(acceptor.open(anyIPEndpoint()).isOk());
+
+    acceptor.asyncAccept()
+            .then([&connectionAccepted](StreamSocket&& ) {
                 connectionAccepted.store(true);
             }).onError([&connectionAccepted](Error&& e) {
                 connectionAccepted.store(false);
@@ -88,9 +96,8 @@ TEST(TestTcpSocket, testAsyncAcceptSyncConnect) {
     // Give eventLoop thread chance to start
     std::this_thread::yield();
 
-    const IPEndpoint endpoint {"127.0.0.1", acceptor.getLocalEndpoint().getPort()};
-    TcpSocket clientSocket(iocontext);
-    clientSocket.connect(endpoint)
+    auto clientSocket = createTCPSocket(iocontext);
+    clientSocket.connect(acceptor.getLocalEndpoint())
             .then([&connectionEstablished]() {
                 connectionEstablished.store(true);
             }).orElse([&connectionEstablished](Error&& e) {
@@ -107,35 +114,37 @@ TEST(TestTcpSocket, testAsyncAcceptSyncConnect) {
 
 TEST(TestTcpSocket, testAsyncReadWrite) {
     EventLoop iocontext;
-    TcpSocket ioTcpServerSocket(iocontext);
 
     char message[] = "Hello there!";
-    const ByteBuffer::size_type messageLen = strlen(message) + 1;
-    auto messageBuffer = ByteBuffer(wrapMemory(message));
+    auto const messageLen = strlen(message) + 1;
+    auto messageBuffer = ByteReader(wrapMemory(message));
 
     char rcv_buffer[128];
-    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    auto readBuffer = ByteWriter(wrapMemory(rcv_buffer));
 
     bool connectionEstablished = false;
     bool connectionAccepted = false;
     bool readComplete = false;
     bool writeComplete = false;
 
-    TcpAcceptor acceptor(iocontext, 0);
-    acceptor.asyncAccept(ioTcpServerSocket)
-            .then([&connectionAccepted, &ioTcpServerSocket, &readBuffer, &messageLen, &readComplete]() {
+    Acceptor acceptor(iocontext);
+    ASSERT_TRUE(acceptor.open(anyIPEndpoint()).isOk());
+
+    acceptor.asyncAccept()
+            .then([&connectionAccepted, &readBuffer, &messageLen, &readComplete](StreamSocket&& sock) {
                 connectionAccepted = true;
 
-                ioTcpServerSocket.asyncRead(readBuffer, messageLen).then([&readComplete]() {
-                    readComplete = true;
-                });
+                sock.asyncRead(readBuffer, messageLen)
+                        .then([&readComplete, c = std::move(sock)]() {
+                            readComplete = true;
+                        });
             }).onError([&connectionAccepted](Error&& e) {
                 connectionAccepted = false;
                 FAIL() << e.toString();
             });
 
 
-    TcpSocket clientSocket(iocontext);
+    auto clientSocket = createTCPSocket(iocontext);
     clientSocket.asyncConnect(acceptor.getLocalEndpoint())
             .then([&connectionEstablished]() {
                 connectionEstablished = true;

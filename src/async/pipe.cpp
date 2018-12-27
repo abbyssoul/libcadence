@@ -9,11 +9,15 @@
 /*******************************************************************************
  * @file: async/pipe.cpp
  *******************************************************************************/
-#include <cadence/async/pipe.hpp>
-
-#include <solace/exception.hpp>
+#include "cadence/async/pipe.hpp"
 
 #include "asio_helper.hpp"
+
+#include <asio/posix/stream_descriptor.hpp>
+#include <asio/read.hpp>
+#include <asio/write.hpp>
+
+#include <solace/exception.hpp>
 
 
 using namespace Solace;
@@ -30,6 +34,7 @@ void createNonblockingPipe(int* fds) {
     }
 }
 
+
 class Pipe::PipeImpl {
 public:
 
@@ -45,7 +50,7 @@ public:
     }
 
 
-    Future<void> asyncRead(ByteBuffer& dest, std::size_t bytesToRead) {
+    Future<void> asyncRead(ByteWriter& dest, std::size_t bytesToRead) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -63,7 +68,7 @@ public:
     }
 
 
-    Future<void> asyncWrite(ByteBuffer& src, std::size_t bytesToWrite) {
+    Future<void> asyncWrite(ByteReader& src, std::size_t bytesToWrite) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
@@ -81,7 +86,7 @@ public:
     }
 
 
-    Result<void, Error> read(ByteBuffer& dest, size_type bytesToRead) {
+    Result<void, Error> read(ByteWriter& dest, size_type bytesToRead) {
         asio::error_code ec;
 
         const auto len = asio::read(_in, asio_buffer(dest, bytesToRead), ec);
@@ -94,7 +99,7 @@ public:
         return Ok();
     }
 
-    Result<void, Error> write(ByteBuffer& src, size_type bytesToWrite) {
+    Result<void, Error> write(ByteReader& src, size_type bytesToWrite) {
         asio::error_code ec;
 
         const auto len = asio::write(_out, asio_buffer(src, bytesToWrite), ec);
@@ -108,16 +113,31 @@ public:
     }
 
 
+    void cancel() {
+        _in.cancel();
+        _out.cancel();
+    }
+
+    void close() {
+        _in.close();
+        _out.close();
+    }
+
+    bool isOpen() {
+        return _in.is_open() && _out.is_open();
+    }
+
+    bool isClosed() {
+        return !isOpen();
+    }
+
 private:
     asio::posix::stream_descriptor _in;
     asio::posix::stream_descriptor _out;
 };
 
 
-Pipe::~Pipe() {
-
-}
-
+Pipe::~Pipe() = default;
 
 Pipe::Pipe(EventLoop& ioContext) :
     Channel(ioContext),
@@ -140,21 +160,38 @@ Pipe& Pipe::swap(Pipe& rhs) noexcept {
 }
 
 
-Future<void> Pipe::asyncRead(ByteBuffer& dest, size_type bytesToRead) {
+Future<void> Pipe::asyncRead(ByteWriter& dest, size_type bytesToRead) {
     return _pimpl->asyncRead(dest, bytesToRead);
 }
 
 
-Future<void> Pipe::asyncWrite(ByteBuffer& src, size_type bytesToWrite) {
+Future<void> Pipe::asyncWrite(ByteReader& src, size_type bytesToWrite) {
     return _pimpl->asyncWrite(src, bytesToWrite);
 }
 
 
-Result<void, Error> Pipe::read(ByteBuffer& dest, size_type bytesToRead) {
+Result<void, Error> Pipe::read(ByteWriter& dest, size_type bytesToRead) {
     return _pimpl->read(dest, bytesToRead);
 }
 
 
-Result<void, Error> Pipe::write(ByteBuffer& src, size_type bytesToWrite) {
+Result<void, Error> Pipe::write(ByteReader& src, size_type bytesToWrite) {
     return _pimpl->write(src, bytesToWrite);
+}
+
+
+void Pipe::cancel() {
+    _pimpl->cancel();
+}
+
+void Pipe::close() {
+    _pimpl->close();
+}
+
+bool Pipe::isOpen() {
+    return _pimpl->isOpen();
+}
+
+bool Pipe::isClosed() {
+    return _pimpl->isClosed();
 }

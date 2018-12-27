@@ -1,3 +1,5 @@
+#include <utility>
+
 /*
 *  Copyright (C) Ivan Ryabov - All Rights Reserved
 *
@@ -17,42 +19,48 @@
 #ifndef CADENCE_IPENDPOINT_HPP
 #define CADENCE_IPENDPOINT_HPP
 
-#include "networkEndpoint.hpp"
+#include "ipaddress.hpp"
 
-#include <solace/string.hpp>
+#include <solace/types.hpp>
+
 
 namespace cadence {
 
 /**
  * TODO(abbyssoul): document this class
  */
-class IPEndpoint :
-        public NetworkEndpoint {
+class IPEndpoint {
 public:
 
-    IPEndpoint(const Solace::String& address, Solace::uint16 port) :
-        _ipAddress(address),
-        _port(port)
+    IPEndpoint(IPAddress address, Solace::uint16 port) noexcept
+        : _port(port)
+        , _ipAddress(std::move(address))
     {
     }
 
-    const Solace::String& getAddress() const {
+
+    IPAddress getAddress() const noexcept {
         return _ipAddress;
     }
 
-    Solace::uint16 getPort() const {
+    Solace::uint16 getPort() const noexcept {
         return _port;
     }
 
 
     //!< @see Solace::IFormattable::toString
-    Solace::String toString() const override;
+    Solace::String toString() const;
 
 private:
-    // FIXME: Should use IPAddress type instead of the String
-    Solace::String  _ipAddress;
+
+//    sockaddr_storage    _addr;
     Solace::uint16  _port;
+    IPAddress       _ipAddress;
 };
+
+
+Solace::Result<IPEndpoint, Solace::Error>
+parseIPEndpoint(Solace::StringView str);
 
 }  // End of namespace cadence
 #endif  // CADENCE_IPENDPOINT_HPP

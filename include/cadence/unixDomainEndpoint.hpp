@@ -17,30 +17,28 @@
 #ifndef CADENCE_UNIXDOMAINENDPOINT_HPP
 #define CADENCE_UNIXDOMAINENDPOINT_HPP
 
-#include "networkEndpoint.hpp"
-
 #include <solace/string.hpp>
+
 
 namespace cadence {
 
 /**
  * An abstract class to represent network address.
  */
-class UnixEndpoint :
-        public NetworkEndpoint {
+class UnixEndpoint {
 public:
 
-    UnixEndpoint(const Solace::String& str) :
-        _str(str)
+    UnixEndpoint(Solace::String str)
+        : _str(std::move(str))
     {}
 
     //!< @see Solace::IFormattable::toString
-    Solace::String toString() const override {
+    Solace::String const& toString() const {
         return _str;
     }
 
 private:
-    const Solace::String _str;
+    Solace::String const    _str;
 };
 
 }  // End of namespace cadence

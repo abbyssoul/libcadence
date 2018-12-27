@@ -26,15 +26,16 @@ namespace cadence { namespace async {
 /**
  * An async wrapper for the POSIX UdpSocket
  */
-class UdpSocket : public Channel {
+class UdpSocket :
+        public Channel {
 public:
 
-    ~UdpSocket();
+    ~UdpSocket() override;
 
     UdpSocket(EventLoop& eventLoop, Solace::uint16 port);
 
-    UdpSocket(const UdpSocket& rhs) = delete;
-    UdpSocket& operator= (const UdpSocket& rhs) = delete;
+    UdpSocket(UdpSocket const& rhs) = delete;
+    UdpSocket& operator= (UdpSocket const& rhs) = delete;
 
     UdpSocket(EventLoop& ioContext);
 
@@ -48,6 +49,8 @@ public:
 
     using Channel::asyncRead;
     using Channel::asyncWrite;
+    using Channel::read;
+    using Channel::write;
 
     /**
      * Post an async read request to read specified amount of data from this IO object into the given buffer.
@@ -58,7 +61,7 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncRead(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+    Solace::Future<void> asyncRead(Solace::ByteWriter& dest, size_type bytesToRead) override;
 
     /**
      * Post an async read request to read data from this IO object into the given buffer.
@@ -67,8 +70,8 @@ public:
      * @param dest The provided destination buffer to read data into.
      * @return A future that will be resolved one the buffer has been filled.
      */
-    Solace::Future<void> asyncReadFrom(Solace::ByteBuffer& dest, const IPEndpoint& remote) {
-        return asyncReadFrom(dest, dest.remaining(), remote);
+    Solace::Future<IPEndpoint> asyncReadFrom(Solace::ByteWriter& dest) {
+        return asyncReadFrom(dest, dest.remaining());
     }
 
     /**
@@ -80,7 +83,7 @@ public:
      *
      * @note If the provided destination buffer is too small to hold requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncReadFrom(Solace::ByteBuffer& dest, size_type bytesToRead, const IPEndpoint& remote);
+    Solace::Future<IPEndpoint> asyncReadFrom(Solace::ByteWriter& dest, size_type bytesToRead);
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -91,7 +94,7 @@ public:
      *
      * @note If the provided source buffer does not have requested amount of data - an exception is raised.
      */
-    Solace::Future<void> asyncWrite(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+    Solace::Future<void> asyncWrite(Solace::ByteReader& src, size_type bytesToWrite) override;
 
     /**
      * Post an async write request to write specified amount of data into this IO object.
@@ -100,8 +103,8 @@ public:
      * @param src The provided source buffer to read data from.
      * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
      */
-    Solace::Future<void> asyncWriteTo(Solace::ByteBuffer& data, const IPEndpoint& dest) {
-        return asyncWriteTo(data, data.remaining(), dest);
+    Solace::Future<void> asyncWriteTo(IPEndpoint const& dest, Solace::ByteReader& data) {
+        return asyncWriteTo(dest, data, data.remaining());
     }
 
     /**
@@ -111,41 +114,41 @@ public:
      * @param src The provided source buffer to read data from.
      * @return A future that will be resolved one the scpecified number of bytes has been written into the IO object.
      */
-    Solace::Future<void> asyncWriteTo(Solace::ByteBuffer& data, size_type bytesToWrite, const IPEndpoint& dest);
+    Solace::Future<void> asyncWriteTo(IPEndpoint const& dest, Solace::ByteReader& data, size_type bytesToWrite);
 
     /**
      * Cancel all asynchronous operations associated with the socket.
      */
-    void cancel();
+    void cancel() override;
 
     /**
      * Close the socket.
      */
-    void close();
+    void close() override;
 
     /**
      * Connect the socket to the specified endpoint syncroniosly.
      * @param endpoint
      */
-    Solace::Result<void, Solace::Error> connect(const IPEndpoint& endpoint);
+    Solace::Result<void, Solace::Error> connect(IPEndpoint const& endpoint);
 
     /** @see Channel::read */
-    Solace::Result<void, Solace::Error> read(Solace::ByteBuffer& dest, size_type bytesToRead) override;
+    Solace::Result<void, Solace::Error> read(Solace::ByteWriter& dest, size_type bytesToRead) override;
 
     /** @see Channel::write */
-    Solace::Result<void, Solace::Error> write(Solace::ByteBuffer& src, size_type bytesToWrite) override;
+    Solace::Result<void, Solace::Error> write(Solace::ByteReader& src, size_type bytesToWrite) override;
 
     /**
      * Determine whether the socket is open.
      * @return True if socket is opened.
      */
-    bool isOpen();
+    bool isOpen() override;
 
     /**
      * Determine whether the socket is closed.
      * @return True if socket is NOT opened.
      */
-    bool isClosed();
+    bool isClosed() override;
 
     /**
      * Get the local endpoint of the socket.
@@ -163,6 +166,13 @@ public:
      * Disable sends or receives on the socket.
      */
     void shutdown();
+
+    /**
+     * Open the socket if it was not opened alread.
+     * @return Open result or an error.
+     */
+    Solace::Result<void, Solace::Error>
+    open();
 
 private:
 

@@ -30,10 +30,10 @@ namespace cadence { namespace async {
 class Timer {
 public:
     //!< Absolute point in time
-    typedef std::chrono::system_clock::time_point time_type;
+    using time_type = std::chrono::system_clock::time_point;
 
     //!< Duration of time
-    typedef std::chrono::milliseconds 	 duration_type;
+    using duration_type = std::chrono::milliseconds;
 
 public:
 
@@ -42,13 +42,11 @@ public:
     Timer(const Timer& rhs) = delete;
     Timer& operator= (const Timer& rhs) = delete;
 
+    Timer(Timer&& rhs) noexcept;
+
     Timer(EventLoop& ioContext);
-
-//    Timer(EventLoop& ioContext, time_type pointInTime);
-
     Timer(EventLoop& ioContext, duration_type durationFromNow);
 
-    Timer(Timer&& rhs);
 
     Timer& operator= (Timer&& rhs) noexcept {
         return swap(rhs);

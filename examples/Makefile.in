@@ -2,10 +2,11 @@ EXAMPLES_BIN = ../$(BUILD_DIR)/bin
 EXAMPLES_BUILD = ../$(BUILD_DIR)/examples
 
 LOCAL_CPPFLAGS = $(patsubst -I%,-I../%,$(CPPFLAGS))
-LOCAL_LDFLAGS = $(patsubst -L%,-L../%,$(LDFLAGS))
+LOCAL_LDFLAGS = $(patsubst -L%,-L../%,$(LDFLAGS)) -fwhole-program
+LDLIBS += -pthread
 
 
-all: $(EXAMPLES_BIN)/async_serial $(EXAMPLES_BIN)/async_client $(EXAMPLES_BIN)/async_server
+all: $(EXAMPLES_BIN)/async_server $(EXAMPLES_BIN)/async_serial $(EXAMPLES_BIN)/serial
 
 
 $(EXAMPLES_BUILD):
@@ -19,12 +20,24 @@ $(EXAMPLES_BUILD)/%.o: %.cpp
 	$(CXX) -c $(CXXFLAGS) $(LOCAL_CPPFLAGS) -o $@ $<
 
 
-# Async_serial
-$(EXAMPLES_BIN)/async_serial: $(EXAMPLES_BUILD)/async_serial.o $(EXAMPLES_BIN)
+#-------------------------------------------------------------------------------
+# Cleanup
+#-------------------------------------------------------------------------------
+
+.PHONY: clean
+clean:
+	$(RM) -rf $(EXAMPLES_BIN)/async_server $(EXAMPLES_BIN)/async_serial
+
+#-------------------------------------------------------------------------------
+# Examples:
+#-------------------------------------------------------------------------------
+
+# sync_serial
+$(EXAMPLES_BIN)/serial: $(EXAMPLES_BUILD)/serial.o $(EXAMPLES_BIN)
 	$(CXX) -o $@ $(LOCAL_CXXFLAGS) $< $(LOCAL_LDFLAGS) $(LDLIBS)
 
-# async_client
-$(EXAMPLES_BIN)/async_client: $(EXAMPLES_BUILD)/async_client.o $(EXAMPLES_BIN)
+# Async_serial
+$(EXAMPLES_BIN)/async_serial: $(EXAMPLES_BUILD)/async_serial.o $(EXAMPLES_BIN)
 	$(CXX) -o $@ $(LOCAL_CXXFLAGS) $< $(LOCAL_LDFLAGS) $(LDLIBS)
 
 # async_server

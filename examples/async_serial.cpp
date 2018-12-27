@@ -12,18 +12,12 @@
 
 #include <solace/memoryManager.hpp>
 #include <solace/cli/parser.hpp>
+#include <solace/output_utils.hpp>
 
 
 #include <iostream>
 
-using Solace::uint32;
-using Solace::StringView;
-using Solace::String;
-using Solace::Path;
-using Solace::MemoryManager;
-using Solace::ByteBuffer;
-using Solace::cli::Parser;
-
+using namespace Solace;
 using namespace cadence::async;
 
 
@@ -47,9 +41,9 @@ int main(int argc, const char **argv) {
     uint32 bufferSize = 120;
     StringView devPath;
 
-    auto res = Parser("libcadence/async_serial", {
-                          Parser::printHelp(),
-                          Parser::printVersion("async_serial", cadence::getBuildVersion()),
+    auto res = cli::Parser("libcadence/async_serial", {
+                          cli::Parser::printHelp(),
+                          cli::Parser::printVersion("async_serial", cadence::getBuildVersion()),
                           {{"b", "boud"}, "Boud rate", &boudRate},
                           {{"bufferSize"}, "Read buffer size", &bufferSize},
                           {{"f", "file"}, "Path to the serial device", &devPath}})
@@ -59,11 +53,11 @@ int main(int argc, const char **argv) {
         const auto& e = res.getError();
 
         if (e) {
-            std::cerr << "Error: " <<  e << std::endl;
+            std::cerr << "Error: " <<  e.toString() << std::endl;
 
             return EXIT_FAILURE;
         } else {
-            std::cerr << e << std::endl;
+            std::cerr << e.toString() << std::endl;
 
             return EXIT_SUCCESS;
         }
@@ -71,10 +65,10 @@ int main(int argc, const char **argv) {
 
 
     EventLoop iocontext;
-    SerialChannel serial(iocontext, Path::parse(devPath), boudRate);
+    SerialChannel serial(iocontext, Path::parse(devPath).unwrap(), boudRate);
 
     MemoryManager memManager(2048);
-    ByteBuffer readBuffer(memManager.create(bufferSize));
+    ByteWriter readBuffer(memManager.allocate(bufferSize));
 
     serial.asyncRead(readBuffer)
             .then([&readBuffer]() {

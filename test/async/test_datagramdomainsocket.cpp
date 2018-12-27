@@ -15,6 +15,8 @@
  *******************************************************************************/
 #include <cadence/async/datagramdomainsocket.hpp>  // Class being tested
 
+#include <solace/output_utils.hpp>
+
 #include "gtest/gtest.h"
 
 using namespace Solace;
@@ -49,28 +51,28 @@ TEST_F(TestDatagramDomainSocket, asyncReadWrite) {
     DatagramDomainSocket clientSocket(iocontext, testClientSocketName);
 
     char message[] = "Hello there!";
-    const ByteBuffer::size_type messageLen = strlen(message) + 1;
+    const ByteReader::size_type messageLen = strlen(message) + 1;
 
-    auto messageBuffer = ByteBuffer(wrapMemory(message));
+    auto messageBuffer = ByteReader(wrapMemory(message));
 
     char rcv_buffer[128];
-    auto readBuffer = ByteBuffer(wrapMemory(rcv_buffer));
+    auto readBuffer = ByteWriter(wrapMemory(rcv_buffer));
 
     bool readComplete = false;
     bool writeComplete = false;
 
-    clientSocket.asyncWriteTo(messageBuffer, messageLen, testServerSocketName)
+    clientSocket.asyncWriteTo(messageBuffer, testServerSocketName)
         .then([&writeComplete]() {
             writeComplete = true;
         }).onError([](Error&& e) {
-            ADD_FAILURE() << e.toString().to_str();
+            ADD_FAILURE() << e.toString();
         });
 
     serverSocket.asyncRead(readBuffer, messageLen)
         .then([&readComplete]() {
             readComplete = true;
         }).onError([](Error&& e) {
-            ADD_FAILURE() << e.toString().to_str();
+            ADD_FAILURE() << e.toString();
         });
 
     iocontext.runFor(300);

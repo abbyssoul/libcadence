@@ -9,9 +9,10 @@
 /*******************************************************************************
  * @file: async/timer.cpp
  *******************************************************************************/
-#include <cadence/async/timer.hpp>
+#include "cadence/async/timer.hpp"
 
 #include "asio_helper.hpp"
+#include <asio/deadline_timer.hpp>
 
 
 using namespace Solace;
@@ -64,8 +65,9 @@ private:
 };
 
 
-Timer::~Timer()
-{}
+
+Timer::~Timer() = default;
+
 
 Timer::Timer(EventLoop& ioContext) :
     _pimpl(std::make_unique<TimerImpl>(ioContext.getIOService()))
@@ -78,8 +80,8 @@ Timer::Timer(EventLoop& ioContext, duration_type durationFromNow) :
 }
 
 
-Timer::Timer(Timer&& rhs) :
-    _pimpl(std::move(rhs._pimpl))
+Timer::Timer(Timer&& rhs) noexcept
+    : _pimpl(std::move(rhs._pimpl))
 {
 }
 

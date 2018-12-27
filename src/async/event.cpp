@@ -16,7 +16,7 @@
 #include <sys/eventfd.h>
 
 #include "asio_helper.hpp"
-
+#include <asio/posix/stream_descriptor.hpp>
 
 
 using namespace Solace;
@@ -58,9 +58,7 @@ private:
 };
 
 
-Event::~Event()
-{
-}
+Event::~Event() = default;
 
 Event::Event(EventLoop& ioContext) :
     _pimpl(std::make_unique<EventImpl>(ioContext.getIOService()))

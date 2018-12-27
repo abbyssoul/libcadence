@@ -11,21 +11,27 @@
 #include <cadence/version.hpp>
 
 #include <solace/memoryManager.hpp>
-#include <solace/cli/parser.hpp>
 #include <solace/output_utils.hpp>
 
+#include <clime/parser.hpp>
 
 #include <iostream>
 
 using namespace Solace;
+using namespace cadence;
 using namespace cadence::async;
 
 
+void printDeviceInfo(SerialPortInfo const& descriptor) {
+    std::cout << descriptor.file << ":" << std::endl;
+    std::cout << "\t - " << descriptor.description << std::endl;
+    std::cout << "\t - " << descriptor.hardwareId << std::endl;
+}
+
+
 void enumerateDevices() {
-    for (const auto& descriptor : Solace::IO::Serial::enumeratePorts()) {
-        std::cout << descriptor.file << ":" << std::endl;
-        std::cout << "\t - " << descriptor.description << std::endl;
-        std::cout << "\t - " << descriptor.hardwareId << std::endl;
+    for (const auto& descriptor : cadence::Serial::enumeratePorts()) {
+        printDeviceInfo(descriptor);
     }
 }
 
@@ -41,9 +47,9 @@ int main(int argc, const char **argv) {
     uint32 bufferSize = 120;
     StringView devPath;
 
-    auto res = cli::Parser("libcadence/async_serial", {
-                          cli::Parser::printHelp(),
-                          cli::Parser::printVersion("async_serial", cadence::getBuildVersion()),
+    auto res = clime::Parser("libcadence/async_serial", {
+                          clime::Parser::printHelp(),
+                          clime::Parser::printVersion("async_serial", cadence::getBuildVersion()),
                           {{"b", "boud"}, "Boud rate", &boudRate},
                           {{"bufferSize"}, "Read buffer size", &bufferSize},
                           {{"f", "file"}, "Path to the serial device", &devPath}})

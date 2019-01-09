@@ -33,7 +33,7 @@ public:
     {}
 
     UnixEndpoint(UnixEndpoint const& ) = delete;
-    UnixEndpoint(UnixEndpoint&& ) = default;
+    UnixEndpoint(UnixEndpoint&&) = default;
 
     //!< @see Solace::IFormattable::toString
     Solace::String const& toString() const {

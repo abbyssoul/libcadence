@@ -25,7 +25,7 @@ using namespace cadence::async;
 
 
 asio::local::datagram_protocol::endpoint
-toAsioLocalDatagramEndpoint(UnixEndpoint const& addr) {//, asio::error_code& ec) {
+toAsioLocalDatagramEndpoint(UnixEndpoint const& addr) {  // TODO(abbyssoul): add version with, asio::error_code& ec) {
     sockaddr_un name;
     name.sun_family = AF_LOCAL;
 
@@ -37,30 +37,6 @@ toAsioLocalDatagramEndpoint(UnixEndpoint const& addr) {//, asio::error_code& ec)
 
     return asio::local::datagram_protocol::endpoint(name.sun_path);
 }
-
-
-//asio::local::datagram_protocol::endpoint
-//toAsioLocalDatagramEndpoint(NetworkEndpoint const& addr) {//, asio::error_code& ec) {
-//    return std::visit([/*&ec*/](auto&& arg) -> asio::local::datagram_protocol::endpoint {
-//        using T = std::decay_t<decltype(arg)>;
-//        if constexpr (std::is_same_v<T, UnixEndpoint>) {
-//            sockaddr_un name;
-//            name.sun_family = AF_LOCAL;
-
-//            // FIXME(abbyssoul): Maybe return an error if the name is too long!
-//            auto const addrNameView = arg.toString().view();
-//            const auto totalSize = std::min<size_t>(addrNameView.size(), sizeof(name.sun_path));
-//            strncpy(name.sun_path, addrNameView.data(), totalSize);
-//            name.sun_path[totalSize - 1] = '\0';
-
-//            return asio::local::datagram_protocol::endpoint(name.sun_path);
-//        } else {
-////            ec = asio::error::make_error_code(asio::error::basic_errors::address_family_not_supported);
-//            return asio::local::datagram_protocol::endpoint();
-//        }
-//    }, addr);
-//}
-
 
 
 class DatagramDomainSocket::SocketImpl {

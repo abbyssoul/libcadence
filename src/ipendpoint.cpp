@@ -37,7 +37,7 @@ IPAddress::toString() const {
 String
 IPEndpoint::toString() const {
     // FIXME(abbyssoul): Should use StringBuilder instead.
-    char buffer[6]; // port is u16, so no more then 65535 which is 5 char long.
+    char buffer[6];  // port is u16, so no more then 65535 which is 5 char long.
     snprintf(buffer, sizeof (buffer), "%hu", _port);
 
     return makeStringJoin(_ipAddress.toString(), ":", StringView(buffer));

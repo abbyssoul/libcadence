@@ -43,11 +43,5 @@ Solace::Error makeError(AsyncError SOLACE_UNUSED(errType), int errCode, Solace::
     return {kAsyncErrorCatergory, errCode, tag};
 }
 
-/*constexpr*/
-//[[nodiscard]] inline
-//Solace::Error makeError(AsyncError errCode, Solace::StringLiteral tag) noexcept {
-//    return {kAsyncErrorCatergory, static_cast<int>(errCode), tag};
-//}
-
 }  // End of namespace cadence
 #endif  // CADENCE_ASYNCERRORDOMAIN_HPP

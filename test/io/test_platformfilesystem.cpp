@@ -20,7 +20,7 @@
  *
  * Created on: 20/06/2016
 *******************************************************************************/
-#include <solace/io/platformFilesystem.hpp>  // Class being tested
+#include <cadence/io/platformFilesystem.hpp>  // Class being tested
 
 #include <solace/memoryManager.hpp>
 #include <solace/exception.hpp>
@@ -34,7 +34,8 @@
 #include <memory.h>
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
+
 
 class TestPlatformFs : public ::testing::Test {
 
@@ -172,7 +173,7 @@ TEST_F(TestPlatformFs, testGetExecPath) {
     auto fs = PlatformFilesystem();
 
     auto const pathToThisTest = fs.getExecPath();
-    EXPECT_EQ(StringLiteral("test_solace"), pathToThisTest.getBasename());
+    EXPECT_EQ(StringLiteral("test_cadence"), pathToThisTest.getBasename());
 }
 
 TEST_F(TestPlatformFs, testThereIsADirectory) {

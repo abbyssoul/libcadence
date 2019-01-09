@@ -10,12 +10,14 @@
 #ifndef CADENCE_ASIO_HELPER_HPP
 #define CADENCE_ASIO_HELPER_HPP
 
-#include <asio/io_context.hpp>
-#include <asio/buffer.hpp>
+#include "asynErrorDomain.hpp"
 
 #include <solace/error.hpp>
 #include <solace/byteReader.hpp>
 #include <solace/byteWriter.hpp>
+
+#include <asio/io_context.hpp>
+#include <asio/buffer.hpp>
 
 
 namespace cadence {
@@ -26,8 +28,8 @@ asio::io_context& asAsioService(void* ioservice) {
 }
 
 inline
-Solace::Error fromAsioError(const asio::error_code& err) {
-    return Solace::Error(err.message(), err.value());
+Solace::Error fromAsioError(asio::error_code const& err, Solace::StringLiteral tag) {
+    return makeError(AsyncError::AsyncError, err.value(), tag);
 }
 
 

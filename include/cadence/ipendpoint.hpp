@@ -32,6 +32,11 @@ namespace cadence {
 class IPEndpoint {
 public:
 
+    IPEndpoint(IPEndpoint const& ) = default;
+    IPEndpoint(IPEndpoint&& ) = default;
+    IPEndpoint& operator= (IPEndpoint&& ) = default;
+    IPEndpoint& operator= (IPEndpoint const& ) = default;
+
     IPEndpoint(IPAddress address, Solace::uint16 port) noexcept
         : _port(port)
         , _ipAddress(std::move(address))

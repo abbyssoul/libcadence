@@ -67,7 +67,7 @@ public:
         return *_ioContext;
     }
 
-    const EventLoop& getIOContext() const noexcept {
+    EventLoop const& getIOContext() const noexcept {
         return *_ioContext;
     }
 
@@ -176,13 +176,13 @@ public:
      * Determine whether the channel is open.
      * @return True if the channel is opened.
      */
-    virtual bool isOpen() = 0;
+    virtual bool isOpen() const = 0;
 
     /**
      * Determine whether the channel is closed.
      * @return True if the channel is NOT opened.
      */
-    virtual bool isClosed() = 0;
+    virtual bool isClosed() const = 0;
 
 private:
 

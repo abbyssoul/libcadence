@@ -51,7 +51,7 @@ public:
      * @param path a path to the file to be created
      * @return A newly created file
      */
-    virtual std::unique_ptr<File> create(Path const& path) = 0;
+    virtual std::unique_ptr<File> create(Solace::Path const& path) = 0;
 
     /**
      * Open already existing file.
@@ -59,7 +59,7 @@ public:
      * @param path A path to the file to be opened
      * @return Opened file
      */
-    virtual std::unique_ptr<File> open(Path const& path) = 0;
+    virtual std::unique_ptr<File> open(Solace::Path const& path) = 0;
 
     /**
      * Unlink file by path.
@@ -68,7 +68,7 @@ public:
      * @param path A path to the file to be removed
      * @return True if file was removed
      */
-    virtual bool unlink(Path const& path) = 0;
+    virtual bool unlink(Solace::Path const& path) = 0;
 
     /**
      * Check if a file identified by the path actually exists.
@@ -76,7 +76,7 @@ public:
      * @param path A path to the file to be checked
      * @return True if file exists
      */
-    virtual bool exists(Path const& path) const = 0;
+    virtual bool exists(Solace::Path const& path) const = 0;
 
 };
 

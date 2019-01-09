@@ -26,14 +26,14 @@ public:
     using Socket_type = asio::ip::udp::socket;
 
 
-    UdpImpl(void* ioservice)
-        : _socket(asAsioService(ioservice))
+    UdpImpl(asio::io_context& ioservice)
+        : _socket(ioservice)
     {
         _socket.open(asio::ip::udp::v4());
     }
 
-    UdpImpl(void* ioservice, uint16 port)
-        : _socket(asAsioService(ioservice), asio::ip::udp::endpoint(asio::ip::udp::v4(), port))
+    UdpImpl(asio::io_context& ioservice, uint16 port)
+        : _socket(ioservice, asio::ip::udp::endpoint(asio::ip::udp::v4(), port))
     {}
 
 
@@ -45,7 +45,7 @@ public:
         _socket.async_receive(asio_buffer(dest, bytesToRead),
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncRead"));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -62,7 +62,7 @@ public:
 
         void operator() (const asio::error_code& ec, std::size_t length) {
             if (ec) {
-                pm.setError(fromAsioError(ec));
+                pm.setError(fromAsioError(ec, "asyncReadFrom"));
             } else {
                 destBuffer.get().advance(length);
                 pm.setValue(fromAsioEndpoint(peerEndpoint));
@@ -70,8 +70,7 @@ public:
         }
     };
 
-    asio::ip::udp::endpoint pe;
-
+    asio::ip::udp::endpoint pe;  // FIXME(abbyssoul): This is a gross hack but there seems to be no way around it.
     Future<IPEndpoint>
     asyncReadFrom(ByteWriter& dest, std::size_t bytesToRead) {
         ReadFromHandler handler{{}, dest, std::ref(pe)};
@@ -109,7 +108,7 @@ public:
         _socket.async_send(asio_buffer(src, bytesToWrite),
             [pm = std::move(promise), &src](asio::error_code const& error, std::size_t bytesTransferred) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncWrite"));
             } else {
                 src.advance(bytesTransferred);
                 pm.setValue();
@@ -120,19 +119,17 @@ public:
     }
 
     Future<void>
-    asyncWriteTo(const IPEndpoint& addr, ByteReader& src, size_type bytesToWrite) {
+    asyncWriteTo(IPEndpoint const& addr, ByteReader& src, size_type bytesToWrite) {
         Promise<void> promise;
         auto f = promise.getFuture();
 
-
-        auto const asioAddr = toAsioIPEndpoint(addr);
-        auto destEndpoint = Socket_type::endpoint_type{asioAddr.address(), asioAddr.port()};
+        auto const destEndpoint = toAsioUDPEndpoint(addr);
 
         asio::error_code e;
         if (!_socket.is_open()) {
             _socket.open(destEndpoint.protocol(), e);
             if (!e) {
-                promise.setError(fromAsioError(e));
+                promise.setError(fromAsioError(e, "asyncWriteTo:open"));
                 return f;
             }
         }
@@ -140,7 +137,7 @@ public:
         _socket.async_send_to(asio_buffer(src, bytesToWrite), destEndpoint,
             [pm = std::move(promise), &src](asio::error_code const& ec, std::size_t length) mutable {
             if (ec) {
-                pm.setError(fromAsioError(ec));
+                pm.setError(fromAsioError(ec, "asyncWriteTo:async_send_to"));
             } else {
                 src.advance(length);
                 pm.setValue();
@@ -156,12 +153,10 @@ public:
 
         const auto len = _socket.receive(asio_buffer(dest, bytesToRead), 0, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
-        } else {
-            dest.advance(len);
+            return Err(fromAsioError(ec, "read"));
         }
 
-        return Ok();
+        return dest.advance(len);
     }
 
     Result<void, Error> write(ByteReader& src, size_type bytesToWrite) {
@@ -169,12 +164,10 @@ public:
 
         const auto len = _socket.send(asio_buffer(src, bytesToWrite), 0, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
-        } else {
-            src.advance(len);
+            return Err(fromAsioError(ec, "write"));
         }
 
-        return Ok();
+        return src.advance(len);
     }
 
     void cancel() {
@@ -186,20 +179,19 @@ public:
     }
 
     Result<void, Error>
-    connect(const IPEndpoint& addr) {
-        auto const asioAddr = toAsioIPEndpoint(addr);
-        auto destEndpoint = Socket_type::endpoint_type{asioAddr.address(), asioAddr.port()};
+    connect(IPEndpoint const& addr) {
+        auto const destEndpoint = toAsioUDPEndpoint(addr);
 
         asio::error_code ec;
         _socket.connect(destEndpoint, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "connect"));
         }
 
         return Ok();
     }
 
-    bool isOpen() {
+    bool isOpen() const {
         return _socket.is_open();
     }
 
@@ -210,7 +202,7 @@ public:
 
         _socket.open(asio::ip::udp::v4(), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "open"));
         }
 
         return Ok();
@@ -237,22 +229,22 @@ private:
 UdpSocket::~UdpSocket() = default;
 
 
-UdpSocket::UdpSocket(EventLoop& ioContext, uint16 port) :
-    Channel(ioContext),
-    _pimpl(std::make_unique<UdpImpl>(ioContext.getIOService(), port))
+UdpSocket::UdpSocket(EventLoop& ioContext, uint16 port)
+    : Channel(ioContext)
+    , _pimpl(std::make_unique<UdpImpl>(asAsioService(ioContext.getIOService()), port))
 {
 }
 
-UdpSocket::UdpSocket(EventLoop& ioContext) :
-    Channel(ioContext),
-    _pimpl(std::make_unique<UdpImpl>(ioContext.getIOService()))
+UdpSocket::UdpSocket(EventLoop& ioContext)
+    : Channel(ioContext)
+    , _pimpl(std::make_unique<UdpImpl>(asAsioService(ioContext.getIOService())))
 {
 }
 
 
-UdpSocket::UdpSocket(UdpSocket&& rhs) :
-    Channel(std::move(rhs)),
-    _pimpl(std::move(rhs._pimpl))
+UdpSocket::UdpSocket(UdpSocket&& rhs) noexcept
+    : Channel(std::move(rhs))
+    , _pimpl(std::move(rhs._pimpl))
 {
 }
 
@@ -307,11 +299,11 @@ Result<void, Error> UdpSocket::write(ByteReader& src, size_type bytesToWrite) {
     return _pimpl->write(src, bytesToWrite);
 }
 
-bool UdpSocket::isOpen() {
+bool UdpSocket::isOpen() const {
     return _pimpl->isOpen();
 }
 
-bool UdpSocket::isClosed() {
+bool UdpSocket::isClosed() const {
     return !_pimpl->isOpen();
 }
 

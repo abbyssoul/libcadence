@@ -106,20 +106,20 @@ public:
     }
 
 
-    std::tuple<uint32, uint32> poll(int msec) override {
+    ReadyIdRange poll(int msec) override {
         auto const r = ::poll(_pollfds.data(), _pollfds.size(), msec);
         if (r < 0) {
             Solace::raise<IOException>(errno);
         } else if (r == 0) {
-            return std::make_tuple(0, 0);
+            return {0, 0};
         }
 
         auto const pollCount = _pollfds.size();
-        return std::make_tuple(findFirstReady(0, pollCount), pollCount);
+        return {findFirstReady(0, pollCount), static_cast<size_type>(pollCount)};
     }
 
 
-    Selector::Event getEvent(size_t i) override {
+    Selector::Event getEvent(size_type i) override {
         const auto& ev = _pollfds[i];
         const auto& selected = _selectables[i];
 
@@ -143,7 +143,7 @@ public:
     }
 
 
-    size_t advance(size_t offsetIndex) override {
+    size_type advance(size_type offsetIndex) override {
         auto const pollCount = _pollfds.size();
 
         // Overflow check
@@ -157,8 +157,8 @@ public:
 
 protected:
 
-    size_t findFirstReady(size_t offsetIndex, size_t pollCount) {
-        for (size_t i = offsetIndex; i < pollCount; ++i) {
+    size_type findFirstReady(size_type offsetIndex, size_type pollCount) {
+        for (auto i = offsetIndex; i < pollCount; ++i) {
             const auto& p = _pollfds[i];
             if (p.revents) {
                 return i;

@@ -39,7 +39,7 @@ class PlatformFilesystem :
 public:
 
     //! Type used to represent file sizes
-    using size_type = MemoryView::size_type;
+    using size_type = Solace::MemoryView::size_type;
 
 
     class BufferedFile :
@@ -49,8 +49,8 @@ public:
         using File::read;
         using File::write;
 
-        IOObject::IOResult read(MutableMemoryView& buffer) override;
-        IOObject::IOResult write(const MemoryView& buffer) override;
+        IOObject::IOResult read(Solace::MutableMemoryView& buffer) override;
+        IOObject::IOResult write(Solace::MemoryView const& buffer) override;
 
         size_type seek(size_type offset, File::Seek type) override;
         void close() override;
@@ -101,7 +101,7 @@ public:
      *
      * TODO(abbyssoul): should return Result<>
      */
-    std::unique_ptr<File> create(Path const& path) override;
+    std::unique_ptr<File> create(Solace::Path const& path) override;
 
     /**
      * Open already existing file
@@ -110,7 +110,7 @@ public:
      *
      * TODO(abbyssoul): should return Result<>
      */
-    std::unique_ptr<File> open(Path const& path) override;
+    std::unique_ptr<File> open(Solace::Path const& path) override;
 
     /**
      * Remove file by path
@@ -119,7 +119,7 @@ public:
      *
      * TODO(abbyssoul): should return Result<>
      */
-    bool unlink(Path const& path) override;
+    bool unlink(Solace::Path const& path) override;
 
     /**
      * Check if a file identified by the path actually exists
@@ -127,7 +127,7 @@ public:
      * @return True if file exists
      *
      */
-    bool exists(Path const& path) const override;
+    bool exists(Solace::Path const& path) const override;
 
 public:
 
@@ -137,14 +137,14 @@ public:
      * @param path A path to check
      * @return True if the path points to a regular file
      */
-    bool isFile(Path const& path) const;
+    bool isFile(Solace::Path const& path) const;
 
     /**
      * Check if the path points to a directory
      * @param path A path to check
      * @return True if the path points to a directory
      */
-    bool isDirectory(Path const& path) const;
+    bool isDirectory(Solace::Path const& path) const;
 
     /**
      * Get timestamp of the file pointed by the path
@@ -152,14 +152,14 @@ public:
      * @param path A path to the file to get timestamp of
      * @return Timestamp of the file
      */
-    time_t getTimestamp(Path const& path) const;
+    time_t getTimestamp(Solace::Path const& path) const;
 
     /**
      * Get the size of the file pointed to by the path
      * @param path A path to the file to get the size of
      * @return Size of the file
      */
-    size_type getFileSize(Path const& path) const;
+    size_type getFileSize(Solace::Path const& path) const;
 
     /**
      * Expand all symbolic links and resolves references to /./, /../ and extra '/' characters in the path
@@ -168,7 +168,7 @@ public:
      * @param path A path to be resolved
      * @return A canonicalized absolute pathname pointed to by the path object passed in.
      */
-    Path realPath(Path const& path) const;
+    Solace::Path realPath(Solace::Path const& path) const;
 
     /** Create a temporary file
      * Creates a temporary binary file for update mode.
@@ -183,31 +183,31 @@ public:
      * @param patter A string pattern for filenames to match
      * @return An array of filenames matching pattern
      */
-    Array<Path> glob(StringView pattern) const;
+    Solace::Array<Solace::Path> glob(Solace::StringView pattern) const;
 
     /** Find pathnames matching a pattern
      *
      * @param patter A string pattern for filenames to match
      * @return An array of filenames matching pattern
      */
-    Array<Path> glob(std::initializer_list<const char*> patterns) const;
+    Solace::Array<Solace::Path> glob(std::initializer_list<const char*> patterns) const;
 
     /**
      * Get the path to the current executable
      * @return The path to the executable
      */
-    Path getExecPath() const;
+    Solace::Path getExecPath() const;
 
     /**
      * Get current working directory of the calling procces.
      * @return Current working directory
      */
-    Path getWorkingDirectory() const;
+    Solace::Path getWorkingDirectory() const;
 
     /**
      * Set current working directory of the calling procces.
      */
-    void setWorkingDirectory(Path const& value);
+    void setWorkingDirectory(Solace::Path const& value);
 
 };
 

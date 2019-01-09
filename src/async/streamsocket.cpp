@@ -59,12 +59,12 @@ void StreamSocket::close() {
     _pimpl->close();
 }
 
-bool StreamSocket::isOpen() {
+bool StreamSocket::isOpen() const {
     return _pimpl->isOpen();
 }
 
 
-bool StreamSocket::isClosed() {
+bool StreamSocket::isClosed() const{
     return _pimpl->isClosed();
 }
 
@@ -82,12 +82,12 @@ void StreamSocket::shutdown() {
 
 
 Future<void>
-StreamSocket::asyncConnect(const NetworkEndpoint& endpoint) {
+StreamSocket::asyncConnect(NetworkEndpoint const& endpoint) {
     return _pimpl->asyncConnect(endpoint);
 }
 
 
 Result<void, Error>
-StreamSocket::connect(const NetworkEndpoint& endpoint) {
+StreamSocket::connect(NetworkEndpoint const& endpoint) {
     return _pimpl->connect(endpoint);
 }

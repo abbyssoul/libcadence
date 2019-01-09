@@ -44,7 +44,7 @@ protected:
 
 
 TEST_F(TestStreamDomainSocket, testAsyncReadWrite) {
-    UnixEndpoint endpoint(testSocketName);
+    NetworkEndpoint endpoint(UnixEndpoint(makeString(testSocketName)));
 
     Acceptor acceptor(iocontext);
     auto ioStreamClientSocket = createUnixSocket(iocontext);

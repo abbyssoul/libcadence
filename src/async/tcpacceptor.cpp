@@ -45,14 +45,14 @@ public:
 
         auto e = toAsioIPEndpoint(endpoint, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "open: to ip endpoint"));
         }
 
         if (!_acceptor.is_open()) {
             _acceptor.open(e.protocol(), ec);
 
             if (ec) {
-                return Err(fromAsioError(ec));
+                return Err(fromAsioError(ec, "open"));
             }
         }
 
@@ -61,18 +61,18 @@ public:
           _acceptor.set_option(asio::socket_base::reuse_address(true), ec);
 
           if (ec) {
-              return Err(fromAsioError(ec));
+              return Err(fromAsioError(ec, "open: set_option"));
           }
         }
 
         _acceptor.bind(e, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "open:bind"));
         }
 
         _acceptor.listen(backlog, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "open:listen"));
         }
 
         return Ok();
@@ -98,7 +98,7 @@ public:
         auto newSocket = _acceptor.accept(ec);
 
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "accept"));
         }
 
         return Ok(StreamSocket{createTCPSocket(*_loop, std::move(newSocket))});
@@ -112,7 +112,7 @@ public:
         using socket_t = asio::ip::tcp::socket;
         _acceptor.async_accept([pm = std::move(prom), l = _loop](asio::error_code const& ec, socket_t&& peer) mutable {
             if (ec) {
-                pm.setError(fromAsioError(ec));
+                pm.setError(fromAsioError(ec, "asyncAccept"));
             } else {
                 pm.setValue(createTCPSocket(*l, std::move(peer)));
             }

@@ -20,7 +20,7 @@
  *
  * Created on: 12 Jun 2016
 *******************************************************************************/
-#include <solace/io/signalDispatcher.hpp>  // Class being tested
+#include <cadence/io/signalDispatcher.hpp>  // Class being tested
 
 #include <gtest/gtest.h>
 
@@ -29,20 +29,10 @@
 #include <sys/time.h>
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
 
-class TestIOSignalDispatcher : public ::testing::Test {
 
-public:
-
-    void setUp() {
-	}
-
-    void tearDown() {
-	}
-};
-
-TEST_F(TestIOSignalDispatcher, testSubscription) {
+TEST(TestIOSignalDispatcher, testSubscription) {
     bool signaled = false;
 
     SignalDispatcher::getInstance().attachHandler(SIGALRM, [&signaled](int signalId) {

@@ -57,7 +57,7 @@ public:
         _in.async_read_some(asio_buffer(dest, bytesToRead),
             [&dest, pm = std::move(promise)](const asio::error_code error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncRead"));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -75,7 +75,7 @@ public:
         _out.async_write_some(asio_buffer(src, bytesToWrite),
             [&src, pm = std::move(promise)](const asio::error_code error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncWrite"));
             } else {
                 src.advance(length);
                 pm.setValue();
@@ -91,7 +91,7 @@ public:
 
         const auto len = asio::read(_in, asio_buffer(dest, bytesToRead), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "read"));
         } else {
             dest.advance(len);
         }
@@ -104,7 +104,7 @@ public:
 
         const auto len = asio::write(_out, asio_buffer(src, bytesToWrite), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "write"));
         } else {
             src.advance(len);
         }
@@ -123,11 +123,11 @@ public:
         _out.close();
     }
 
-    bool isOpen() {
+    bool isOpen() const {
         return _in.is_open() && _out.is_open();
     }
 
-    bool isClosed() {
+    bool isClosed() const {
         return !isOpen();
     }
 
@@ -146,9 +146,9 @@ Pipe::Pipe(EventLoop& ioContext) :
 }
 
 
-Pipe::Pipe(Pipe&& rhs) :
-    Channel(std::move(rhs)),
-    _pimpl(std::move(rhs._pimpl))
+Pipe::Pipe(Pipe&& rhs) noexcept
+    : Channel(std::move(rhs))
+    , _pimpl(std::move(rhs._pimpl))
 {}
 
 
@@ -188,10 +188,10 @@ void Pipe::close() {
     _pimpl->close();
 }
 
-bool Pipe::isOpen() {
+bool Pipe::isOpen() const {
     return _pimpl->isOpen();
 }
 
-bool Pipe::isClosed() {
+bool Pipe::isClosed() const {
     return _pimpl->isClosed();
 }

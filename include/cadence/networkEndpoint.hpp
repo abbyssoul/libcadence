@@ -8,10 +8,7 @@
 */
 /*******************************************************************************
  * libcadence: Abstract network endpoint type
- *	@file		cadence/networkEndpoint.hpp
- *	@author		$LastChangedBy$
- *	@date		$LastChangedDate$
- *	ID:			$Id$
+ * @file        cadence/networkEndpoint.hpp
  ******************************************************************************/
 #pragma once
 #ifndef CADENCE_NETWORKENDPOINT_HPP

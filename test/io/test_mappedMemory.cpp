@@ -20,7 +20,7 @@
  *
  * Created on: 03/07/2016
 *******************************************************************************/
-#include <solace/io/sharedMemory.hpp>  // Class being tested
+#include <cadence/io/sharedMemory.hpp>  // Class being tested
 
 #include <solace/exception.hpp>
 #include <gtest/gtest.h>
@@ -32,10 +32,10 @@
 #include <sys/wait.h>
 #include <sys/mman.h>
 
-#include "../interruptexception.hpp"
+
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
 
 
 TEST(TestAnonSharedMemory, testCreate_InvalidSize) {

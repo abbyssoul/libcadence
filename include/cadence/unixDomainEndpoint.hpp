@@ -32,13 +32,16 @@ public:
         : _str(std::move(str))
     {}
 
+    UnixEndpoint(UnixEndpoint const& ) = delete;
+    UnixEndpoint(UnixEndpoint&& ) = default;
+
     //!< @see Solace::IFormattable::toString
     Solace::String const& toString() const {
         return _str;
     }
 
 private:
-    Solace::String const    _str;
+    Solace::String  _str;
 };
 
 }  // End of namespace cadence

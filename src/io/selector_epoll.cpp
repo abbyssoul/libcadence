@@ -38,7 +38,7 @@
 
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
 
 
 bool operator== (const epoll_data_t& a, const epoll_data_t& b) {
@@ -53,7 +53,7 @@ bool operator== (const epoll_event& a, const epoll_event& b) {
 namespace /*anonymous*/ {
 
 class EPollSelectorImpl :
-        public Solace::IO::Selector::IPollerImpl {
+        public Selector::IPollerImpl {
 public:
 
     ~EPollSelectorImpl() override {
@@ -136,7 +136,7 @@ public:
     }
 
 
-    std::tuple<uint32, uint32> poll(int msec) override {
+    ReadyIdRange poll(int msec) override {
 
         for (int i = 0; i < 3; ++i) {   // Allow for 3 interapts in a row
             const int ready = epoll_wait(_epfd, _evlist.data(), _evlist.size(), msec);
@@ -146,15 +146,15 @@ public:
                     Solace::raise<IOException>(errno);
                 }
             } else {
-                return std::make_tuple(0, ready);
+                return {0, static_cast<size_type>(ready)};
             }
         }
 
-        return std::make_tuple(0, 0);
+        return {0, 0};
     }
 
 
-    Selector::Event getEvent(size_t i) override {
+    Selector::Event getEvent(size_type i) override {
         const auto& ev = _evlist[i];
         auto const selected = static_cast<Selector::Event*>(ev.data.ptr);
 
@@ -175,7 +175,7 @@ public:
         return event;
     }
 
-    size_t advance(size_t offsetIndex) override {
+    size_type advance(size_type offsetIndex) override {
         return offsetIndex + 1;
     }
 

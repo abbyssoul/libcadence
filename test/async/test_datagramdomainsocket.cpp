@@ -44,8 +44,8 @@ protected:
 
 
 TEST_F(TestDatagramDomainSocket, asyncReadWrite) {
-    UnixEndpoint testClientSocketName(testClientSocketNameStr);
-    UnixEndpoint testServerSocketName(testServerSocketNameStr);
+    UnixEndpoint testClientSocketName(makeString(testClientSocketNameStr));
+    UnixEndpoint testServerSocketName(makeString(testServerSocketNameStr));
 
     DatagramDomainSocket serverSocket(iocontext, testServerSocketName);
     DatagramDomainSocket clientSocket(iocontext, testClientSocketName);

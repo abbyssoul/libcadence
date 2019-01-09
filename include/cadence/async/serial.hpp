@@ -90,10 +90,10 @@ public:
     void close() override;
 
     /** @see Channel::isOpen */
-    bool isOpen() override;
+    bool isOpen() const override;
 
     /** @see Channel::isClosed */
-    bool isClosed() override;
+    bool isClosed() const override;
 
 
 private:

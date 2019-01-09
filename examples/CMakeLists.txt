@@ -19,3 +19,7 @@ target_link_libraries(async_server ${PROJECT_NAME})
 set(EXAMPLE_serial_SOURCE_FILES serial.cpp)
 add_executable(serial ${EXAMPLE_serial_SOURCE_FILES})
 target_link_libraries(serial ${PROJECT_NAME})
+
+
+add_custom_target(examples
+    DEPENDS async_serial serial async_server)

@@ -84,10 +84,10 @@ public:
     void close() override;
 
     /** @see Channel::isOpen */
-    bool isOpen() override;
+    bool isOpen() const override;
 
     /** @see Channel::isClosed */
-    bool isClosed() override;
+    bool isClosed() const override;
 
 
     /** @see Channel::read */
@@ -119,7 +119,7 @@ public:
      * This call will block until a connection is complete (either successfully or in an error)
      * @param endpoint An endpoint to connect to.
      */
-    Solace::Result<void, Solace::Error> connect(const NetworkEndpoint& endpoint);
+    Solace::Result<void, Solace::Error> connect(NetworkEndpoint const& endpoint);
 
 
     /**
@@ -127,7 +127,7 @@ public:
      * @param endpoint An endpoint to connect to.
      * @return Future that is resolved when connection is establised or an error occured.
      */
-    Solace::Future<void> asyncConnect(const NetworkEndpoint& endpoint);
+    Solace::Future<void> asyncConnect(NetworkEndpoint const& endpoint);
 
 
 public:
@@ -160,10 +160,10 @@ public:
         void close() = 0;
 
         virtual
-        bool isOpen() = 0;
+        bool isOpen() const = 0;
 
         virtual
-        bool isClosed() = 0;
+        bool isClosed() const = 0;
 
         virtual
         NetworkEndpoint getLocalEndpoint() const = 0;

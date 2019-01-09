@@ -11,7 +11,6 @@
  *******************************************************************************/
 #include "cadence/async/eventloop.hpp"
 
-
 #include <asio/io_context.hpp>
 
 

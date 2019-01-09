@@ -43,7 +43,7 @@ public:
         _eventFd.async_read_some(asio::buffer(&_readBuffer, sizeof(_readBuffer)),
             [pm = std::move(promise)] (const asio::error_code& error, std::size_t) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncAwait"));
             } else {
                 pm.setValue();
             }

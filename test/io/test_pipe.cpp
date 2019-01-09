@@ -20,7 +20,7 @@
  *
  * Created on: 10/10/2016
 *******************************************************************************/
-#include <solace/io/pipe.hpp>  // Class being tested
+#include <cadence/io/pipe.hpp>  // Class being tested
 
 #include <solace/exception.hpp>
 #include <gtest/gtest.h>
@@ -32,10 +32,10 @@
 #include <sys/wait.h>
 #include <sys/mman.h>
 
-#include "../interruptexception.hpp"
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
+
 
 class TestBlockingPipe: public ::testing::Test {
 

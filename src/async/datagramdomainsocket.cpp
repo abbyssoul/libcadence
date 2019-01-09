@@ -7,7 +7,7 @@
 *  Written by Ivan Ryabov <abbyssoul@gmail.com>
 */
 /*******************************************************************************
- * @file: async/DatagramDomainSocket.cpp
+ * @file: async/datagramdomainsocket.cpp
 *******************************************************************************/
 #include "cadence/async/datagramdomainsocket.hpp"
 
@@ -15,18 +15,59 @@
 #include "asio_helper.hpp"
 #include "asio_helper_local.hpp"
 
+#include <asio/local/datagram_protocol.hpp>
+
 
 using namespace Solace;
 using namespace cadence;
 using namespace cadence::async;
 
 
+
+asio::local::datagram_protocol::endpoint
+toAsioLocalDatagramEndpoint(UnixEndpoint const& addr) {//, asio::error_code& ec) {
+    sockaddr_un name;
+    name.sun_family = AF_LOCAL;
+
+    // FIXME(abbyssoul): Maybe return an error if the name is too long!
+    auto const addrNameView = addr.toString().view();
+    const auto totalSize = std::min<size_t>(addrNameView.size(), sizeof(name.sun_path));
+    strncpy(name.sun_path, addrNameView.data(), totalSize);
+    name.sun_path[totalSize - 1] = '\0';
+
+    return asio::local::datagram_protocol::endpoint(name.sun_path);
+}
+
+
+//asio::local::datagram_protocol::endpoint
+//toAsioLocalDatagramEndpoint(NetworkEndpoint const& addr) {//, asio::error_code& ec) {
+//    return std::visit([/*&ec*/](auto&& arg) -> asio::local::datagram_protocol::endpoint {
+//        using T = std::decay_t<decltype(arg)>;
+//        if constexpr (std::is_same_v<T, UnixEndpoint>) {
+//            sockaddr_un name;
+//            name.sun_family = AF_LOCAL;
+
+//            // FIXME(abbyssoul): Maybe return an error if the name is too long!
+//            auto const addrNameView = arg.toString().view();
+//            const auto totalSize = std::min<size_t>(addrNameView.size(), sizeof(name.sun_path));
+//            strncpy(name.sun_path, addrNameView.data(), totalSize);
+//            name.sun_path[totalSize - 1] = '\0';
+
+//            return asio::local::datagram_protocol::endpoint(name.sun_path);
+//        } else {
+////            ec = asio::error::make_error_code(asio::error::basic_errors::address_family_not_supported);
+//            return asio::local::datagram_protocol::endpoint();
+//        }
+//    }, addr);
+//}
+
+
+
 class DatagramDomainSocket::SocketImpl {
 public:
 
-
-    SocketImpl(void* ioservice, const String& endpoing) :
-        _socket(asAsioService(ioservice), asio::local::datagram_protocol::endpoint(endpoing.to_str()))
+    SocketImpl(void* ioservice, UnixEndpoint const& endpoing)
+        : _socket(asAsioService(ioservice), toAsioLocalDatagramEndpoint(endpoing))
     {}
 
     SocketImpl(void* ioservice) :
@@ -38,11 +79,11 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        asio::local::datagram_protocol::endpoint endpoint(peer.toString().to_str());
+        auto const endpoint = toAsioLocalDatagramEndpoint(peer);
         _socket.async_connect(endpoint,
             [pm = std::move(promise)](const asio::error_code& error) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncConnect"));
             } else {
                 pm.setValue();
             }
@@ -59,7 +100,7 @@ public:
         _socket.async_receive(asio_buffer(dest, bytesToRead),
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asynRead"));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -75,11 +116,11 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
+        auto destination = toAsioLocalDatagramEndpoint(endpoint);
         _socket.async_receive_from(asio_buffer(dest, bytesToRead), destination,
             [pm = std::move(promise), &dest](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncReadFrom"));
             } else {
                 dest.advance(length);
                 pm.setValue();
@@ -98,7 +139,7 @@ public:
         _socket.async_send(asio_buffer(src, bytesToWrite),
             [pm = std::move(promise), &src](const asio::error_code& error, std::size_t bytesTransferred) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncWrite"));
             } else {
                 src.advance(bytesTransferred);
                 pm.setValue();
@@ -114,11 +155,11 @@ public:
         Promise<void> promise;
         auto f = promise.getFuture();
 
-        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
+        auto const destination = toAsioLocalDatagramEndpoint(endpoint);
         _socket.async_send_to(asio_buffer(src, bytesToWrite), destination,
             [pm = std::move(promise), &src](const asio::error_code& error, std::size_t bytesTransferred) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncWriteTo"));
             } else {
                 src.advance(bytesTransferred);
                 pm.setValue();
@@ -129,13 +170,14 @@ public:
     }
 
 
-    Result<void, Error> connect(UnixEndpoint const& endpoint) {
-        asio::local::datagram_protocol::endpoint destination(endpoint.toString().c_str());
+    Result<void, Error>
+    connect(UnixEndpoint const& endpoint) {
+        auto const destination = toAsioLocalDatagramEndpoint(endpoint);
         asio::error_code ec;
 
         _socket.connect(destination, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "connect"));
         }
 
         return Ok();
@@ -144,27 +186,23 @@ public:
     Result<void, Error> read(ByteWriter& dest, size_type bytesToRead) {
         asio::error_code ec;
 
-        const auto len = _socket.receive(asio_buffer(dest, bytesToRead), 0, ec);
+        auto const len = _socket.receive(asio_buffer(dest, bytesToRead), 0, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
-        } else {
-            dest.advance(len);
+            return Err(fromAsioError(ec, "read"));
         }
 
-        return Ok();
+        return dest.advance(len);
     }
 
     Result<void, Error> write(ByteReader& src, size_type bytesToWrite) {
         asio::error_code ec;
 
-        const auto len = _socket.send(asio_buffer(src, bytesToWrite), 0, ec);
+        auto const len = _socket.send(asio_buffer(src, bytesToWrite), 0, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
-        } else {
-            src.advance(len);
+            return Err(fromAsioError(ec, "write"));
         }
 
-        return Ok();
+        return src.advance(len);
     }
 
 
@@ -177,16 +215,24 @@ public:
     }
 
 
-    bool isOpen() {
+    bool isOpen() const {
         return _socket.is_open();
     }
 
     UnixEndpoint getLocalEndpoint() const {
-        return {_socket.local_endpoint().path()};
+        // TODO(abbyssoul): may throw and thus must use ec accepting version and return result<>
+        auto localEndpoint = _socket.local_endpoint();
+        auto data = localEndpoint.data();
+
+        return {makeString(data->sa_data, localEndpoint.size())};
     }
 
     UnixEndpoint getRemoteEndpoint() const {
-        return {_socket.remote_endpoint().path()};
+        // TODO(abbyssoul): may throw and thus must use ec accepting version and return result<>
+        auto localEndpoint = _socket.remote_endpoint();
+        auto data = localEndpoint.data();
+
+        return {makeString(data->sa_data, localEndpoint.size())};
     }
 
     void shutdown() {
@@ -210,9 +256,9 @@ DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext) :
 }
 
 
-DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext, const UnixEndpoint& endpoint) :
+DatagramDomainSocket::DatagramDomainSocket(EventLoop& ioContext, UnixEndpoint const& endpoint) :
     Channel(ioContext),
-    _pimpl(std::make_unique<SocketImpl>(ioContext.getIOService(), endpoint.toString()))
+    _pimpl(std::make_unique<SocketImpl>(ioContext.getIOService(), endpoint))
 {
 }
 
@@ -278,11 +324,11 @@ Result<void, Error> DatagramDomainSocket::write(ByteReader& src, size_type bytes
     return _pimpl->write(src, bytesToWrite);
 }
 
-bool DatagramDomainSocket::isOpen() {
+bool DatagramDomainSocket::isOpen() const {
     return _pimpl->isOpen();
 }
 
-bool DatagramDomainSocket::isClosed() {
+bool DatagramDomainSocket::isClosed() const {
     return !_pimpl->isOpen();
 }
 

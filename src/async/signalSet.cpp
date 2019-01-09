@@ -37,7 +37,7 @@ public:
 
         _signals.async_wait([pm = std::move(promise)] (const asio::error_code& error, int signalNumber) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncWait"));
             } else {
                 pm.setValue(signalNumber);
             }

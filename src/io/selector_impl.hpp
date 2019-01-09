@@ -22,7 +22,7 @@
 #ifndef SELECTOR_IMPL_H
 #define SELECTOR_IMPL_H
 
-#include "cadence/io/selectable.hpp"
+#include "cadence/io/selector.hpp"
 
 #include <tuple>
 
@@ -31,6 +31,12 @@ namespace cadence {
 
 class Selector::IPollerImpl {
 public:
+    using size_type = Selector::size_type;
+
+    struct ReadyIdRange {
+        size_type firstReady;
+        size_type count;
+    };
 
     virtual ~IPollerImpl() = default;
 
@@ -44,11 +50,11 @@ public:
 
     virtual void remove(ISelectable::poll_id fd) = 0;
 
-    virtual std::tuple<uint32, uint32> poll(int msec) = 0;
+    virtual ReadyIdRange poll(int msec) = 0;
 
-    virtual Selector::Event getEvent(size_t i) = 0;
+    virtual Selector::Event getEvent(size_type i) = 0;
 
-    virtual size_t advance(size_t i) = 0;
+    virtual size_type advance(size_type i) = 0;
 };
 
 

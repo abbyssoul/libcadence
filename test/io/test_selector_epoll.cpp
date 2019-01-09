@@ -20,15 +20,15 @@
  *
  * Created on: 10/06/2016
 *******************************************************************************/
-#include <solace/io/selector.hpp>  // Class being tested
+#include <cadence/io/selector.hpp>  // Class being tested
 
-#include <solace/io/pipe.hpp>
+#include <cadence/io/pipe.hpp>
 #include <solace/exception.hpp>
 
 #include <gtest/gtest.h>
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
 
 
 #ifdef SOLACE_PLATFORM_LINUX

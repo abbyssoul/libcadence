@@ -1,20 +1,22 @@
 cmake_minimum_required(VERSION 3.3)
 project(cadence)
+set(PROJECT_DESCRIPTION "IPC library for modern C++")
 
 
 # Custom build target to generate code coverage:
 # Don't want this to run on every build.
 option(CADENCE_GTEST_SUPPORT "Build without GTEST" ON)
-option(CADENCE_COVERALLS "Generate coveralls data" OFF)
-option(CADENCE_SANITIZE "Enable 'sanitize' compiler flag" OFF)
-option(CADENCE_LIBSOLACE_SUPPORT "Build without libsolace" ON)
+option(COVERALLS "Generate coveralls data" OFF)
+option(SANITIZE "Enable 'sanitize' compiler flag" OFF)
 
 # Include common compile flag
 include(cmake/compile_flags.cmake)
+include(GNUInstallDirs)
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup()
 
-# Require at least C++17
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED on)
+# Configure the project:
+configure_file(lib${PROJECT_NAME}.pc.in lib${PROJECT_NAME}.pc @ONLY)
 
 # ---------------------------------
 # Build project dependencies
@@ -22,16 +24,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CADENCE_EXTERNAL_DEP_GTEST_DIR "external/gtest/googletest"
     CACHE PATH "The path to the Google Test framework.")
 
-if (CADENCE_LIBSOLACE_SUPPORT)
-    if(CADENCE_GTEST_SUPPORT)
-        set(SOLACE_GTEST_SUPPORT OFF CACHE BOOL "Don't use dependencie's gtest" FORCE)
-        message(STATUS, "Turning solace GTEST off")
-    endif()
-
-    message(STATUS, "Adding local libsolce")
-    add_subdirectory(external/libsolace EXCLUDE_FROM_ALL)
-    include_directories(${solace_SOURCE_DIR}/include)
-endif()
+set(CADENCE_EXTERNAL_DEP_ASIO_DIR "external/asio/asio/include"
+    CACHE PATH "The path to the ASIO async IO library.")
 
 include_directories(include)
 
@@ -39,13 +33,17 @@ add_subdirectory(src)
 add_subdirectory(test EXCLUDE_FROM_ALL)
 add_subdirectory(examples EXCLUDE_FROM_ALL)
 
+# Install include headers
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Install pkgconfig descriptor
+install(FILES ${CMAKE_BINARY_DIR}/lib${PROJECT_NAME}.pc
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/pkgconfig)
 
 # ---------------------------------
 # Show build configuration status:
 # ---------------------------------
 message(STATUS, "BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message(STATUS, "CXXFLAGS: ${CMAKE_CXX_FLAGS}")
-message(STATUS, "CADENCE_SANITIZE: ${CADENCE_SANITIZE}")
-message(STATUS, "CADENCE_COVERALLS: ${CADENCE_COVERALLS}")
-message(STATUS, "CADENCE_LIBSOLACE_SUPPORT: ${CADENCE_LIBSOLACE_SUPPORT}")
-message(STATUS, "CADENCE_GTEST_SUPPORT: ${CADENCE_GTEST_SUPPORT}")
+message(STATUS, "SANITIZE: ${SANITIZE}")
+message(STATUS, "COVERALLS: ${COVERALLS}")

@@ -19,6 +19,23 @@
 namespace cadence {
 
 inline
+IPEndpoint fromAsioEndpoint(asio::ip::tcp::endpoint const& addr) {
+return IPEndpoint( addr.address().is_v4()
+                      ? IPAddress(addr.address().to_v4().to_bytes())
+                      : IPAddress(addr.address().to_v6().to_bytes())
+                      , addr.port());
+}
+
+inline
+IPEndpoint fromAsioEndpoint(asio::ip::udp::endpoint const& addr) {
+return IPEndpoint( addr.address().is_v4()
+                      ? IPAddress(addr.address().to_v4().to_bytes())
+                      : IPAddress(addr.address().to_v6().to_bytes())
+                      , addr.port());
+}
+
+
+inline
 asio::ip::address toAsioIPAddress(IPAddress addr) {
     if (addr.isV4()) {
         return asio::ip::address_v4(addr.getBytes_v4());
@@ -35,7 +52,12 @@ asio::ip::address toAsioIPAddress(IPAddress addr) {
  * @return asio endpoint represening the same input.
  */
 inline
-asio::ip::tcp::endpoint toAsioIPEndpoint(IPEndpoint const& addr) {
+asio::ip::tcp::endpoint toAsioTCPEndpoint(IPEndpoint const& addr) {
+    return {toAsioIPAddress(addr.getAddress()), addr.getPort()};
+}
+
+inline
+asio::ip::udp::endpoint toAsioUDPEndpoint(IPEndpoint const& addr) {
     return {toAsioIPAddress(addr.getAddress()), addr.getPort()};
 }
 
@@ -50,32 +72,15 @@ asio::ip::tcp::endpoint toAsioIPEndpoint(IPEndpoint const& addr) {
  */
 inline
 asio::ip::tcp::endpoint toAsioIPEndpoint(NetworkEndpoint const& addr, asio::error_code& ec) {
-
     return std::visit([&ec](auto&& arg) -> asio::ip::tcp::endpoint {
         using T = std::decay_t<decltype(arg)>;
         if constexpr (std::is_same_v<T, IPEndpoint>) {
-            return toAsioIPEndpoint(arg);
+            return toAsioTCPEndpoint(arg);
         } else {
-                ec = asio::error::make_error_code(asio::error::basic_errors::address_family_not_supported);
-                return toAsioIPEndpoint(IPEndpoint{IPAddress::any(), 0});
+            ec = asio::error::make_error_code(asio::error::basic_errors::address_family_not_supported);
+            return toAsioTCPEndpoint(IPEndpoint{IPAddress::any(), 0});
         }
     }, addr);
-}
-
-inline
-IPEndpoint fromAsioEndpoint(asio::ip::tcp::endpoint const& addr) {
-    return IPEndpoint( addr.address().is_v4()
-                       ? IPAddress(addr.address().to_v4().to_bytes())
-                       : IPAddress(addr.address().to_v6().to_bytes())
-                       , addr.port());
-}
-
-inline
-IPEndpoint fromAsioEndpoint(asio::ip::udp::endpoint const& addr) {
-    return IPEndpoint( addr.address().is_v4()
-                       ? IPAddress(addr.address().to_v4().to_bytes())
-                       : IPAddress(addr.address().to_v6().to_bytes())
-                       , addr.port());
 }
 
 }  // end of namespace cadence

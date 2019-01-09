@@ -39,7 +39,7 @@ public:
 
     UdpSocket(EventLoop& ioContext);
 
-    UdpSocket(UdpSocket&& rhs);
+    UdpSocket(UdpSocket&& rhs) noexcept;
 
     UdpSocket& operator= (UdpSocket&& rhs) noexcept {
         return swap(rhs);
@@ -142,13 +142,13 @@ public:
      * Determine whether the socket is open.
      * @return True if socket is opened.
      */
-    bool isOpen() override;
+    bool isOpen() const override;
 
     /**
      * Determine whether the socket is closed.
      * @return True if socket is NOT opened.
      */
-    bool isClosed() override;
+    bool isClosed() const override;
 
     /**
      * Get the local endpoint of the socket.

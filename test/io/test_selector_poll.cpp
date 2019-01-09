@@ -20,28 +20,19 @@
  *
  * Created on: 21/09/2016
 *******************************************************************************/
-#include <solace/io/selector.hpp>  // Class being tested
+#include <cadence/io/selector.hpp>  // Class being tested
+#include <cadence/io/pipe.hpp>
 
-#include <solace/io/pipe.hpp>
 #include <solace/exception.hpp>
 
 #include <gtest/gtest.h>
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
 
-class TestPollSelector : public ::testing::Test {
 
-public:
 
-    void setUp() {
-	}
-
-    void tearDown() {
-	}
-};
-
-TEST_F(TestPollSelector, testSubscription) {
+TEST(TestPollSelector, testSubscription) {
     Pipe p;
 
     auto s = Selector::createPoll(5);
@@ -55,7 +46,8 @@ TEST_F(TestPollSelector, testSubscription) {
     EXPECT_EQ(p.getWriteEnd().getSelectId(), ev.fd);
 }
 
-TEST_F(TestPollSelector, testReadPolling) {
+
+TEST(TestPollSelector, testReadPolling) {
     Pipe p;
 
     auto s = Selector::createPoll(5);
@@ -90,7 +82,8 @@ TEST_F(TestPollSelector, testReadPolling) {
     EXPECT_TRUE(i == i.end());
 }
 
-TEST_F(TestPollSelector, testEmptyPolling) {
+
+TEST(TestPollSelector, testEmptyPolling) {
     auto s = Selector::createPoll(3);
 
     auto i = s.poll(1);
@@ -98,7 +91,7 @@ TEST_F(TestPollSelector, testEmptyPolling) {
     EXPECT_THROW(++i, IndexOutOfRangeException);
 }
 
-TEST_F(TestPollSelector, testRemoval) {
+TEST(TestPollSelector, testRemoval) {
     Pipe p;
 
     Selector s = Selector::createPoll(5);
@@ -122,7 +115,8 @@ TEST_F(TestPollSelector, testRemoval) {
     }
 }
 
-TEST_F(TestPollSelector, testRemovalOfNotAddedItem) {
+
+TEST(TestPollSelector, testRemovalOfNotAddedItem) {
     Pipe p;
 
     auto s = Selector::createPoll(5);

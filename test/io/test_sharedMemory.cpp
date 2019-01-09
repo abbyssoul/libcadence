@@ -20,10 +20,10 @@
  *
  * Created on: 03/07/2016
 *******************************************************************************/
-#include <solace/io/sharedMemory.hpp>  // Class being tested
+#include <cadence/io/sharedMemory.hpp>  // Class being tested
+#include <cadence/io/file.hpp>
 
 #include <solace/uuid.hpp>
-#include <solace/io/file.hpp>
 #include <solace/exception.hpp>
 
 #include <gtest/gtest.h>
@@ -37,7 +37,7 @@
 
 
 using namespace Solace;
-using namespace Solace::IO;
+using namespace cadence;
 
 
 TEST(TestSharedMemory, testCreate_InvalidFilename) {

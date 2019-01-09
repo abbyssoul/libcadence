@@ -86,7 +86,7 @@ void Selector::remove(ISelectable::poll_id fd) {
 
 
 Selector::Iterator Selector::poll(int msec) {
-    auto r = _pimpl->poll(msec);
+    auto const r = _pimpl->poll(msec);
 
-    return Selector::Iterator(_pimpl.get(), std::get<0>(r), std::get<1>(r));
+    return {_pimpl.get(), r.firstReady, r.count};
 }

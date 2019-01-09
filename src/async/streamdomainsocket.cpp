@@ -24,6 +24,39 @@ using namespace cadence;
 using namespace cadence::async;
 
 
+asio::local::stream_protocol::endpoint
+cadence::toAsioLocalEndpoint(NetworkEndpoint const& addr, asio::error_code& ec) {
+    return std::visit([&ec](auto&& arg) -> asio::local::stream_protocol::endpoint {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, UnixEndpoint>) {
+            sockaddr_un name;
+            name.sun_family = AF_LOCAL;
+
+            // FIXME(abbyssoul): Maybe return an error if the name is too long!
+            auto const addrNameView = arg.toString().view();
+            const auto totalSize = std::min<size_t>(addrNameView.size(), sizeof(name.sun_path));
+            strncpy(name.sun_path, addrNameView.data(), totalSize);
+            name.sun_path[totalSize - 1] = '\0';
+
+            return asio::local::stream_protocol::endpoint(name.sun_path);
+        } else {
+            ec = asio::error::make_error_code(asio::error::basic_errors::address_family_not_supported);
+            return asio::local::stream_protocol::endpoint();
+        }
+    }, addr);
+}
+
+
+NetworkEndpoint
+cadence::fromAsioEndpoint(asio::local::stream_protocol::endpoint const& addr) {
+    const auto str = addr.path();
+
+    UnixEndpoint point(Solace::makeString(str.data(), str.size()));
+    return std::move(point);
+}
+
+
+
 namespace {
 // Anounimous namespace
 
@@ -35,16 +68,16 @@ public:
     using Socket_type = asio::local::stream_protocol::socket;
 
 
-    StreamDomainSocketImpl(void* ioservice) :
-        _socket(asAsioService(ioservice))
+    StreamDomainSocketImpl(asio::io_context& ioservice)
+        : _socket(ioservice)
     {}
 
-    StreamDomainSocketImpl(Socket_type&& other) :
-        _socket(std::move(other))
+    StreamDomainSocketImpl(Socket_type&& other)
+        : _socket(std::move(other))
     {}
 
-    StreamDomainSocketImpl(StreamDomainSocketImpl&& other) :
-        _socket(std::move(other._socket))
+    StreamDomainSocketImpl(StreamDomainSocketImpl&& other)
+        : _socket(std::move(other._socket))
     {}
 
 
@@ -57,7 +90,7 @@ public:
             [pm = std::move(promise), &dest] (asio::error_code const& error, std::size_t bytes_transferred) mutable {
                 dest.advance(bytes_transferred);
                 if (error) {
-                    pm.setError(fromAsioError(error));
+                    pm.setError(fromAsioError(error, "asyncRead"));
                 } else {
                     pm.setValue();
                 }
@@ -76,7 +109,7 @@ public:
             [pm = std::move(promise), &src] (asio::error_code const& error, std::size_t bytes_transferred) mutable {
                 src.advance(bytes_transferred);
                 if (error) {
-                    pm.setError(fromAsioError(error));
+                    pm.setError(fromAsioError(error, "asyncWrite"));
                 } else {
                     pm.setValue();
                 }
@@ -91,7 +124,7 @@ public:
 
          auto const len = asio::read(_socket, asio_buffer(dest, bytesToRead), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "read"));
         } else {
             dest.advance(len);
         }
@@ -105,7 +138,7 @@ public:
 
          auto const len = asio::write(_socket, asio_buffer(src, bytesToWrite), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "write"));
         } else {
             src.advance(len);
         }
@@ -122,11 +155,11 @@ public:
         _socket.close();
     }
 
-    bool isOpen() override {
+    bool isOpen() const override {
         return _socket.is_open();
     }
 
-    bool isClosed() override {
+    bool isClosed() const override {
         return !_socket.is_open();
     }
 
@@ -150,13 +183,13 @@ public:
         asio::error_code ec;
         auto const asioEndpoint = toAsioLocalEndpoint(endpoint, ec);
         if (ec) {
-            promise.setError(fromAsioError(ec));
+            promise.setError(fromAsioError(ec, "asyncConnect: local-endpoint"));
             return f;
         }
 
         _socket.async_connect(asioEndpoint, [pm = std::move(promise)] (asio::error_code const& error) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncConnect"));
             } else {
                 pm.setValue();
             }
@@ -171,12 +204,12 @@ public:
 
         auto const asioEndpoint = toAsioLocalEndpoint(endpoint, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "connect: to-local-endpoint"));
         }
 
         _socket.connect(asioEndpoint, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "connect"));
         }
 
         return Ok();
@@ -196,7 +229,7 @@ private:
 
 StreamSocket
 cadence::async::createUnixSocket(EventLoop& loop) {
-    return { loop, std::make_unique<StreamDomainSocketImpl>(loop.getIOService()) };
+    return { loop, std::make_unique<StreamDomainSocketImpl>(asAsioService(loop.getIOService())) };
 }
 
 StreamSocket

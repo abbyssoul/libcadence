@@ -11,6 +11,7 @@
  *******************************************************************************/
 #include "cadence/async/acceptor.hpp"
 
+#include <solace/posixErrorDomain.hpp>
 
 using namespace Solace;
 using namespace cadence;
@@ -31,9 +32,9 @@ Acceptor::Acceptor(EventLoop& ioContext)
 
 Result<void, Error>
 Acceptor::open(NetworkEndpoint const& endpoint) {
-
-    if (_pimpl)
-        return Err(Error("Already opened"));
+    if (_pimpl) {
+        return Err(makeError(SystemErrors::ISCONN, "Acceptor::open"));
+    }
 
     _pimpl = std::visit([this](auto&& e) {
         using T = std::decay_t<decltype(e)>;

@@ -35,16 +35,16 @@ public:
     using Socket_type = asio::ip::tcp::socket;
 
 
-    TcpSocketImpl(void* ioservice) :
-        _socket(asAsioService(ioservice))
+    TcpSocketImpl(asio::io_context& ioservice)
+        : _socket(ioservice)
     {}
 
-    TcpSocketImpl(Socket_type&& other) :
-        _socket(std::move(other))
+    TcpSocketImpl(Socket_type&& other)
+        : _socket(std::move(other))
     {}
 
-    TcpSocketImpl(TcpSocketImpl&& other) :
-        _socket(std::move(other._socket))
+    TcpSocketImpl(TcpSocketImpl&& other) noexcept
+        : _socket(std::move(other._socket))
     {}
 
     Future<void>
@@ -55,9 +55,9 @@ public:
         asio::async_read(_socket, asio_buffer(dest, bytesToRead),
             [pm = std::move(promise), &dest](asio::error_code const& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncRead"));
             } else {
-                dest.advance(length);
+                dest.advance(length);  // FIXME: Is it an error if we can't advance anymore?
                 pm.setValue();
             }
         });
@@ -74,9 +74,9 @@ public:
         asio::async_write(_socket, asio_buffer(src, bytesToWrite),
             [pm = std::move(promise), &src](asio::error_code const& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncWrite"));
             } else {
-                src.advance(length);
+                src.advance(length);   // FIXME: Is it an error if we can't advance anymore?
                 pm.setValue();
             }
         });
@@ -90,12 +90,10 @@ public:
 
         auto const len = asio::read(_socket, asio_buffer(dest, bytesToRead), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
-        } else {
-            dest.advance(len);
+            return Err(fromAsioError(ec, "read"));
         }
 
-        return Ok();
+        return dest.advance(len);
     }
 
     Result<void, Error>
@@ -104,12 +102,10 @@ public:
 
         auto const len = asio::write(_socket, asio_buffer(src, bytesToWrite), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
-        } else {
-            src.advance(len);
+            return Err(fromAsioError(ec, "write"));
         }
 
-        return Ok();
+        return src.advance(len);
     }
 
 
@@ -121,11 +117,11 @@ public:
         _socket.close();
     }
 
-    bool isOpen() override {
+    bool isOpen() const override {
         return _socket.is_open();
     }
 
-    bool isClosed() override {
+    bool isClosed() const override {
         return !_socket.is_open();
     }
 
@@ -149,13 +145,13 @@ public:
         asio::error_code ec;
         auto const asioEndpoint = toAsioIPEndpoint(endpoint, ec);
         if (ec) {
-            promise.setError(fromAsioError(ec));
+            promise.setError(fromAsioError(ec, "asyncConnect: to ip endpoint"));
             return f;
         }
 
         _socket.async_connect(asioEndpoint, [pm = std::move(promise)] (asio::error_code const& error) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncConnect"));
             } else {
                 pm.setValue();
             }
@@ -170,12 +166,12 @@ public:
 
         auto const asioEndpoint = toAsioIPEndpoint(endpoint, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "connect: to ip endpoint"));
         }
 
         _socket.connect(asioEndpoint, ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "connect"));
         }
 
         return Ok();
@@ -195,7 +191,7 @@ private:
 
 StreamSocket
 cadence::async::createTCPSocket(EventLoop& loop) {
-    return { loop, std::make_unique<TcpSocketImpl>(loop.getIOService()) };
+    return { loop, std::make_unique<TcpSocketImpl>(asAsioService(loop.getIOService())) };
 
 }
 

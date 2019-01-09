@@ -66,13 +66,13 @@ asio::serial_port_base::flow_control::type toAsioFlowcontrol(Serial::Flowcontrol
 
 class SerialChannel::SerialImpl {
 public:
-    SerialImpl(void* ioservice, const Path& file,
+    SerialImpl(void* ioservice, Path const& file,
                                  uint32 baudrate,
                                  Serial::Bytesize bytesize,
                                  Serial::Parity parity,
                                  Serial::Stopbits stopbits,
-                                 Serial::Flowcontrol flowcontrol) :
-        _serial(asAsioService(ioservice), file.toString().c_str())
+                                 Serial::Flowcontrol flowcontrol)
+        : _serial(asAsioService(ioservice), file.toString().view().data())
     {
         _serial.set_option(asio::serial_port_base::baud_rate(baudrate));
         _serial.set_option(asio::serial_port_base::character_size(static_cast<uint32>(bytesize)));
@@ -91,7 +91,7 @@ public:
         _serial.async_read_some(asio_buffer(buffer, bytesToRead),
             [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncRead"));
             } else {
                 buffer.advance(length);
                 pm.setValue();
@@ -110,7 +110,7 @@ public:
         _serial.async_write_some(asio_buffer(buffer, bytesToWrite),
             [pm = std::move(promise), &buffer](const asio::error_code& error, std::size_t length) mutable {
             if (error) {
-                pm.setError(fromAsioError(error));
+                pm.setError(fromAsioError(error, "asyncWrite"));
             } else {
                 buffer.advance(length);
                 pm.setValue();
@@ -125,7 +125,7 @@ public:
 
         const auto len = asio::read(_serial, asio_buffer(dest, bytesToRead), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "read"));
         } else {
             dest.advance(len);
         }
@@ -138,7 +138,7 @@ public:
 
         const auto len = asio::write(_serial, asio_buffer(src, bytesToWrite), ec);
         if (ec) {
-            return Err(fromAsioError(ec));
+            return Err(fromAsioError(ec, "write"));
         } else {
             src.advance(len);
         }
@@ -232,10 +232,10 @@ void SerialChannel::close() {
     _pimpl->close();
 }
 
-bool SerialChannel::isOpen() {
+bool SerialChannel::isOpen() const {
     return _pimpl->isOpen();
 }
 
-bool SerialChannel::isClosed() {
+bool SerialChannel::isClosed() const {
     return _pimpl->isClosed();
 }

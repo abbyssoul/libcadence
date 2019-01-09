@@ -36,7 +36,7 @@ return IPEndpoint( addr.address().is_v4()
 
 
 inline
-asio::ip::address toAsioIPAddress(IPAddress addr) {
+asio::ip::address toAsioIPAddress(IPAddress const& addr) {
     if (addr.isV4()) {
         return asio::ip::address_v4(addr.getBytes_v4());
     } else {

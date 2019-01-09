@@ -37,14 +37,18 @@ public:
     IPEndpoint& operator= (IPEndpoint&&) = default;
     IPEndpoint& operator= (IPEndpoint const&) = default;
 
-    IPEndpoint(IPAddress address, Solace::uint16 port) noexcept
+    IPEndpoint(IPAddress const& address, Solace::uint16 port) noexcept
         : _port(port)
-        , _ipAddress(std::move(address))
+        , _ipAddress(address)
     {
     }
 
 
-    IPAddress getAddress() const noexcept {
+    IPAddress getAddress() noexcept {
+        return _ipAddress;
+    }
+
+    IPAddress const& getAddress() const noexcept {
         return _ipAddress;
     }
 

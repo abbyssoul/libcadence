@@ -28,6 +28,11 @@ using namespace cadence::async;
 using namespace std::chrono_literals;
 
 
+std::ostream& operator<< (std::ostream& ostr, std::chrono::milliseconds const& dt) {
+    return ostr << dt.count() << "ms";
+}
+
+
 TEST(TestAsyncTimer, testTimeout) {
     EventLoop iocontext;
     int64 nbTimesCalled = 0;
@@ -35,9 +40,10 @@ TEST(TestAsyncTimer, testTimeout) {
     Timer timer(iocontext, std::chrono::milliseconds(15));
 
     // We managed to cancel the timer. Start new asynchronous wait.
-    timer.asyncWait().then([&nbTimesCalled, &iocontext](int64 numberOfExpirations) {
-        nbTimesCalled += numberOfExpirations;
-    });
+    timer.asyncWait()
+        .then([&nbTimesCalled](int64 numberOfExpirations) {
+            nbTimesCalled += numberOfExpirations;
+        });
 
     iocontext.run();
     std::thread watchdog([&iocontext]() {
@@ -52,18 +58,22 @@ TEST(TestAsyncTimer, testTimeout) {
     ASSERT_EQ(1L, nbTimesCalled);
 }
 
+
 TEST(TestAsyncTimer, testGetTimeout) {
     EventLoop iocontext;
     int nbTimesCalled = 0;
 
-    const int64 timeoutTime = 15;
-    Timer timer(iocontext, std::chrono::milliseconds(timeoutTime));
-    timer.asyncWait().then([&nbTimesCalled, &iocontext](int64 numberOfExpirations) {
-        nbTimesCalled += numberOfExpirations;
-    });
+    auto const timeoutTimeMs = std::chrono::milliseconds(15);
+    auto const timerCreated = std::chrono::steady_clock::now();
+    Timer timer(iocontext, timeoutTimeMs);
 
-    const auto initTimeout = timer.getTimeout();
-    ASSERT_LE(timeoutTime - initTimeout.count(), 3);
+    timer.asyncWait()
+        .then([&nbTimesCalled](int64 nbOfExpirations) {
+            nbTimesCalled += nbOfExpirations;
+        });
+
+    auto const dt = std::chrono::duration_cast<std::chrono::milliseconds>(timer.getTimeout() - timerCreated);
+    ASSERT_LE(dt, timeoutTimeMs);
 
     iocontext.run();
 

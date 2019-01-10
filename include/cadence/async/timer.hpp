@@ -30,7 +30,7 @@ namespace cadence { namespace async {
 class Timer {
 public:
     //!< Absolute point in time
-    using time_type = std::chrono::system_clock::time_point;
+    using time_type = std::chrono::steady_clock::time_point;
 
     //!< Duration of time
     using duration_type = std::chrono::milliseconds;
@@ -54,14 +54,13 @@ public:
 
     Timer& swap(Timer& rhs) noexcept;
 
-
     Solace::Future<Solace::int64> asyncWait();
 
     Timer& setTimeout(duration_type timeoutDuration);
 
-    duration_type getTimeout() const;
+    time_type getTimeout() const;
 
-	Timer& cancel();
+    Timer& cancel();
 
 private:
     class TimerImpl;

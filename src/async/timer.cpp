@@ -12,7 +12,7 @@
 #include "cadence/async/timer.hpp"
 
 #include "asio_helper.hpp"
-#include <asio/deadline_timer.hpp>
+#include <asio/steady_timer.hpp>
 
 
 using namespace Solace;
@@ -21,24 +21,22 @@ using namespace cadence::async;
 
 class Timer::TimerImpl {
 public:
-    TimerImpl(void* ioservice) :
-        _timer(asAsioService(ioservice))
+
+    TimerImpl(asio::io_context& ioservice) :
+        _timer(ioservice)
     {}
 
-    TimerImpl(void* ioservice, duration_type duration) :
-        _timer(asAsioService(ioservice), boost::posix_time::milliseconds(duration.count()))
+    TimerImpl(asio::io_context& ioservice, duration_type duration) :
+        _timer(ioservice, duration)
     {}
 
 
     void setTimeout(duration_type timeoutDuration) {
-        _timer.expires_from_now(boost::posix_time::milliseconds(timeoutDuration.count()));
+        _timer.expires_after(timeoutDuration);
     }
 
-
-    duration_type getTimeout() const {
-        const auto f = _timer.expires_from_now().fractional_seconds();
-
-        return duration_type(f);
+    time_type getTimeout() const {
+        return _timer.expiry();
     }
 
     void cancel() {
@@ -49,7 +47,7 @@ public:
         Promise<int64> promise;
         auto f = promise.getFuture();
 
-        _timer.async_wait([pm = std::move(promise)](const asio::error_code& error) mutable {
+        _timer.async_wait([pm = std::move(promise)](asio::error_code const& error) mutable {
             if (error) {
                 pm.setError(fromAsioError(error, "asyncWait"));
             } else {
@@ -61,7 +59,8 @@ public:
     }
 
 private:
-    asio::deadline_timer _timer;
+//    asio::deadline_timer _timer;
+    asio::steady_timer _timer;
 };
 
 
@@ -70,12 +69,12 @@ Timer::~Timer() = default;
 
 
 Timer::Timer(EventLoop& ioContext) :
-    _pimpl(std::make_unique<TimerImpl>(ioContext.getIOService()))
+    _pimpl(std::make_unique<TimerImpl>(asAsioService(ioContext.getIOService())))
 {
 }
 
 Timer::Timer(EventLoop& ioContext, duration_type durationFromNow) :
-    _pimpl(std::make_unique<TimerImpl>(ioContext.getIOService(), durationFromNow))
+    _pimpl(std::make_unique<TimerImpl>(asAsioService(ioContext.getIOService()), durationFromNow))
 {
 }
 
@@ -101,7 +100,7 @@ Timer& Timer::setTimeout(duration_type timeoutDuration) {
 }
 
 
-Timer::duration_type Timer::getTimeout() const {
+Timer::time_type Timer::getTimeout() const {
     return _pimpl->getTimeout();
 }
 
@@ -110,7 +109,7 @@ Timer::duration_type Timer::getTimeout() const {
 Timer& Timer::cancel() {
     _pimpl->cancel();
 
-	return (*this);
+    return (*this);
 }
 
 

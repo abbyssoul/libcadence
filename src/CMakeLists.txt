@@ -36,6 +36,8 @@ set(SOURCE_FILES
 
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CONAN_LIBS})
+#set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FEATURES "-DASIO_STANDALONE")
+add_definitions("-DASIO_STANDALONE")
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ../${CADENCE_EXTERNAL_DEP_ASIO_DIR})
 

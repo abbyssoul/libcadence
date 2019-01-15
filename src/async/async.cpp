@@ -20,6 +20,3 @@ using namespace cadence::async;
 
 
 Channel::~Channel() = default;
-
-
-const AtomValue cadence::kAsyncErrorCatergory = atom("pasy");

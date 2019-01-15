@@ -20,7 +20,7 @@ using namespace cadence::async;
 class EventLoop::EventloopImpl {
 public:
 
-    bool poll() {
+    EventLoop::size_type poll() {
         return _io_service.poll();
     }
 
@@ -32,7 +32,7 @@ public:
         _io_service.run_for(std::chrono::milliseconds(msec));
     }
 
-    bool isStopped() {
+    bool isStopped() const {
         return _io_service.stopped();
     }
 
@@ -66,13 +66,12 @@ private:
 EventLoop::~EventLoop() = default;
 
 
-EventLoop::EventLoop() :
-    _pimpl(std::make_unique<EventloopImpl>())
+EventLoop::EventLoop()
+    : _pimpl(std::make_unique<EventloopImpl>())
 {
-
 }
 
-bool EventLoop::poll() {
+EventLoop::size_type EventLoop::poll() {
     return _pimpl->poll();
 }
 
@@ -84,7 +83,7 @@ void EventLoop::runFor(int msec) {
     _pimpl->runFor(msec);
 }
 
-bool EventLoop::isStopped() {
+bool EventLoop::isStopped() const noexcept {
     return _pimpl->isStopped();
 }
 

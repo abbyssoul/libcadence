@@ -316,7 +316,7 @@ PlatformFilesystem::getExecPath() const {
 
 #elif defined(SOLACE_PLATFORM_APPLE)
     char execPath[1024];
-    uint buffSize = sizeof(execPath);
+    size_t buffSize = sizeof(execPath);
     auto const success = (_NSGetExecutablePath(execPath, &buffSize) == 0);
     execPath[buffSize - 1] = '\0';
     if (!success) {

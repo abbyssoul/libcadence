@@ -20,16 +20,16 @@
 #include <asio/buffer.hpp>
 
 
-namespace cadence {
+namespace cadence::async {
 
-inline
-asio::io_context& asAsioService(void* ioservice) {
+inline constexpr
+asio::io_context& asAsioService(void* ioservice) noexcept {
     return *static_cast<asio::io_context*>(ioservice);
 }
 
 inline
-Solace::Error fromAsioError(asio::error_code const& err, Solace::StringLiteral tag) {
-    return makeError(AsyncError::AsyncError, err.value(), tag);
+Solace::Error fromAsioError(asio::error_code const& err, Solace::StringLiteral tag) noexcept {
+    return makeError(AsyncError::AsyncSystemError, err.value(), tag);
 }
 
 
@@ -43,5 +43,5 @@ asio::const_buffer asio_buffer(Solace::ByteReader& dest, Solace::ByteReader::siz
     return asio::buffer(dest.viewRemaining().slice(0, bytes).dataAddress(), bytes);
 }
 
-}  // end of namespace cadence
+}  // end of namespace cadence::async
 #endif  // CADENCE_ASIO_HELPER_HPP

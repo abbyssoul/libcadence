@@ -50,21 +50,20 @@ public:
             return Err(fromAsioError(ec, "open: to endpoint"));
         }
 
+        if (reuseAddr) {
+            _acceptor.set_option(asio::socket_base::reuse_address(true), ec);
+
+            if (ec) {
+                return Err(fromAsioError(ec, "open:set_option"));
+            }
+        }
+
         if (!_acceptor.is_open()) {
             _acceptor.open(e.protocol(), ec);
 
             if (ec) {
                 return Err(fromAsioError(ec, "open"));
             }
-        }
-
-
-        if (reuseAddr) {
-          _acceptor.set_option(asio::socket_base::reuse_address(true), ec);
-
-          if (ec) {
-              return Err(fromAsioError(ec, "open:set_option"));
-          }
         }
 
         _acceptor.bind(e, ec);

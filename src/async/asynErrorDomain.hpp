@@ -26,7 +26,7 @@
 #include <solace/errorDomain.hpp>
 
 
-namespace cadence {
+namespace cadence::async {
 
 
 /** Category of async errors.
@@ -35,7 +35,7 @@ namespace cadence {
 extern const Solace::AtomValue kAsyncErrorCatergory;
 
 enum class AsyncError: int {
-    AsyncError
+    AsyncSystemError
 };
 
 [[nodiscard]] inline
@@ -43,5 +43,5 @@ Solace::Error makeError(AsyncError SOLACE_UNUSED(errType), int errCode, Solace::
     return {kAsyncErrorCatergory, errCode, tag};
 }
 
-}  // End of namespace cadence
+}  // End of namespace cadence::async
 #endif  // CADENCE_ASYNCERRORDOMAIN_HPP

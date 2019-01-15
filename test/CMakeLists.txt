@@ -7,6 +7,7 @@ set(TEST_SOURCE_FILES
         ci/teamcity_gtest.cpp
 
         test_ipaddress.cpp
+        test_unixDomainEndpoint.cpp
 
         io/test_mappedMemory.cpp
         io/test_platformfilesystem.cpp

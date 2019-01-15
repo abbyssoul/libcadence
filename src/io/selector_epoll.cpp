@@ -64,7 +64,7 @@ public:
     EPollSelectorImpl& operator= (EPollSelectorImpl const&) = delete;
 
     // FIXME: evlist will actually leak if we throw here...
-    explicit EPollSelectorImpl(uint maxReportedEvents)
+    explicit EPollSelectorImpl(size_type maxReportedEvents)
         : _evlist(maxReportedEvents)
         , _epfd{epoll_create(maxReportedEvents)}
     {
@@ -189,7 +189,7 @@ private:
 }  // namespace
 
 
-Selector Selector::createEPoll(uint eventSize) {
+Selector Selector::createEPoll(size_type eventSize) {
     return Selector(std::make_unique<EPollSelectorImpl>(eventSize));
 }
 

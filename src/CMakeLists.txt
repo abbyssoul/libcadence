@@ -17,6 +17,7 @@ set(SOURCE_FILES
         io/serial_list_ports.cpp
         io/pipe.cpp
 
+        async/asyncSystemErrorDomain.cpp
         async/streamsocket.cpp
         async/eventLoop.cpp
         async/udpsocket.cpp
@@ -36,8 +37,8 @@ set(SOURCE_FILES
 
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CONAN_LIBS})
-#set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FEATURES "-DASIO_STANDALONE")
-add_definitions("-DASIO_STANDALONE")
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE "-DASIO_STANDALONE")
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ../${CADENCE_EXTERNAL_DEP_ASIO_DIR})
 

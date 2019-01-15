@@ -15,9 +15,9 @@
 #include <solace/memoryManager.hpp>
 #include <solace/uuid.hpp>
 #include <solace/base16.hpp>
-#include <solace/cli/parser.hpp>
 #include <solace/output_utils.hpp>
 
+#include <clime/parser.hpp>
 
 #include <iostream>
 #include <csignal>
@@ -29,7 +29,7 @@ using namespace cadence::async;
 
 
 std::ostream& operator<< (std::ostream& ostr, NetworkEndpoint const& endpoint) {
-    std::visit([](auto&& arg) {
+    std::visit([](auto const& arg) {
         std::cout << arg.toString();
     }, endpoint);
 
@@ -55,7 +55,7 @@ public:
         ++NbSessions;
     }
 
-    Session(Session&& rhs)
+    Session(Session&& rhs) noexcept
         : channel(std::move(rhs.channel))
         , remoteEndpoint(std::move(rhs.remoteEndpoint))
         , inBuffer{}
@@ -64,37 +64,38 @@ public:
         , writer{wrapMemory(inBuffer)}
     {
         std::cout << "Moving Session" << NbSessions << std::endl;
+        ++NbSessions;
     }
 
 
     void doRead() {
-        if (channel.getIOContext().isStopped())
+        if (channel.isClosed() || channel.getIOContext().isStopped()) {
             return;
+        }
 
         auto self_ = shared_from_this();
 
         // Prepare in-buffer for the next read
         writer.clear();
         channel.asyncRead(writer)
-                .then([self = std::move(self_)]() {
-//                    std::cout << "Data from [" << self->remoteEndpoint << "]: "
-//                              << "\"" << self->writer.viewWritten() << "\"" << std::endl;
+            .then([self = std::move(self_)]() {
+                // Encode data received
+                auto encodedResponce = ByteWriter(wrapMemory(self->outBuffer));
+                auto encoder = Base16Encoder(encodedResponce);
+                encoder.encode(self->writer.viewWritten());
 
-                    // Encode data received
-                    ByteWriter encodedResp(wrapMemory(self->outBuffer));
-                    Base16Encoder encoder(encodedResp);
-                    encoder.encode(self->writer.viewWritten());
-                    encodedResp.write('\n');
+                // We add extra new-line to help with formatting
+                encodedResponce.write('\n');
 
-                    self->channel.asyncWrite(self->reader)
-                            .then([self_cont = std::move(self)]() {
-                                self_cont->reader.rewind();
-                                self_cont->doRead();
-                            })
-                            .onError([](Error&& e) {
-                                std::cerr << "Failed to write respoce: " << e.toString() << std::endl;
-                            });
-                });
+                self->channel.asyncWrite(self->reader)
+                    .then([self_cont = std::move(self)]() {
+                        self_cont->reader.rewind();
+                        self_cont->doRead();
+                    })
+                    .onError([](Error&& e) {
+                        std::cerr << "Failed to write respoce: " << e.toString() << std::endl;
+                    });
+            });
     }
 
 private:
@@ -120,11 +121,11 @@ uint32 Session::NbSessions = 0;
 
 int main(int argc, const char **argv) {
     uint16 serverPort = 5640;
-    StringView serverEndpoint("127.0.0.1");
+    auto serverEndpoint = StringView("127.0.0.1");
 
-    auto res = cli::Parser("libcadence/async_server", {
-                            cli::Parser::printHelp(),
-                            cli::Parser::printVersion("async_server", cadence::getBuildVersion()),
+    auto res = clime::Parser("libcadence/async_server", {
+                            clime::Parser::printHelp(),
+                            clime::Parser::printVersion("async_server", cadence::getBuildVersion()),
 
                             {{"p", "port"}, "Server port", &serverPort},
                             {{"h", "host"}, "Server listen address", &serverEndpoint}
@@ -132,14 +133,14 @@ int main(int argc, const char **argv) {
             .parse(argc, argv);
 
     if (!res) {
-        const auto& e = res.getError();
+        auto const& e = res.getError();
 
         if (e) {
-            std::cerr << "Error: " <<  e.toString() << std::endl;
+            std::cerr << "Error: " <<  e << std::endl;
 
             return EXIT_FAILURE;
         } else {
-            std::cerr << e.toString() << std::endl;
+            std::cerr << e << std::endl;
 
             return EXIT_SUCCESS;
         }
@@ -151,33 +152,30 @@ int main(int argc, const char **argv) {
         return EXIT_FAILURE;
     }
 
-    IPAddress const serverIp = ipParseResult.unwrap();
-    EventLoop iocontext;
-
-    AsyncServer server(iocontext, onNewConnection);
-
-    IPEndpoint ipEndpoint(serverIp, serverPort);
+    EventLoop loop;
+    auto const ipEndpoint = IPEndpoint(ipParseResult.unwrap(), serverPort);
+    auto server = AsyncServer(loop, onNewConnection);
     server.startListen(ipEndpoint)
-            .then([&ipEndpoint](){
-                std::cout << "Server listening at " << ipEndpoint.toString() << std::endl;
-            })
-            .orElse([](Error&& e) {
-                std::cerr << e.toString() << std::endl;
-            });
+        .then([&ipEndpoint](){
+            std::cout << "Server listening at " << ipEndpoint.toString() << std::endl;
+        })
+        .orElse([](Error&& e) {
+            std::cerr << e.toString() << std::endl;
+        });
 
     // Setup signal handlers for CTRL-C and SIGTERM
-    auto sigs = SignalSet{iocontext, {SIGINT, SIGTERM}};
+    auto sigs = SignalSet{loop, {SIGINT, SIGTERM}};
     sigs.asyncWait()
-            .then([&server, &iocontext](int sig) {
-                std::cout << "Signal: " << sig << ", stopping server" << std::endl;
-                server.stop();
-                iocontext.stop();
+        .then([&server, &loop](int sig) {
+            std::cout << "Signal: " << sig << ", stopping server" << std::endl;
+            server.stop();
+            loop.stop();
 
-                std::cout << "Dangling sessions: " << Session::NbSessions << std::endl;
-            });
+            std::cout << "Dangling sessions: " << Session::NbSessions << std::endl;
+        });
 
     // Run event loop
-    iocontext.run();
+    loop.run();
 
     return EXIT_SUCCESS;
 }

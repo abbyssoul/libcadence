@@ -44,8 +44,6 @@ protected:
 
 
 TEST_F(TestStreamDomainSocket, testAsyncReadWrite) {
-    NetworkEndpoint endpoint(UnixEndpoint(makeString(testSocketName)));
-
     Acceptor acceptor(iocontext);
     auto ioStreamClientSocket = createUnixSocket(iocontext);
 
@@ -60,6 +58,7 @@ TEST_F(TestStreamDomainSocket, testAsyncReadWrite) {
     bool readComplete = false;
     bool writeComplete = false;
 
+    NetworkEndpoint endpoint(UnixEndpoint(makeString(testSocketName)));
     ASSERT_TRUE(acceptor.open(endpoint));
 
     acceptor.asyncAccept()

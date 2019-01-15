@@ -36,7 +36,7 @@ cadence::toAsioLocalEndpoint(NetworkEndpoint const& addr, asio::error_code& ec) 
             auto const addrNameView = arg.toString().view();
             const auto totalSize = std::min<size_t>(addrNameView.size(), sizeof(name.sun_path));
             strncpy(name.sun_path, addrNameView.data(), totalSize);
-            name.sun_path[totalSize - 1] = '\0';
+            name.sun_path[totalSize] = '\0';
 
             return asio::local::stream_protocol::endpoint(name.sun_path);
         } else {

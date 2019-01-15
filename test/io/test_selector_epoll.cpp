@@ -53,7 +53,7 @@ TEST_F(TestEPollSelector, testSubscription) {
 
     auto i = s.poll(1);
     EXPECT_TRUE(i != i.end());
-    EXPECT_EQ(static_cast<uint>(1), i.size());
+    EXPECT_EQ(1, i.size());
 
     auto ev = *i;
 //        EXPECT_EQ(static_cast<void*>(&p.getWriteEnd()), ev.data);
@@ -103,7 +103,7 @@ TEST_F(TestEPollSelector, testEmptyPolling) {
 
     auto i = s.poll(1);
     EXPECT_TRUE(!(i != i.end()));
-    EXPECT_EQ(static_cast<uint>(0), i.size());
+    EXPECT_EQ(0, i.size());
     EXPECT_THROW(++i, IndexOutOfRangeException);
 }
 
@@ -117,7 +117,7 @@ TEST_F(TestEPollSelector, testRemoval) {
     {
         auto i = s.poll(1);
         EXPECT_TRUE(i != i.end());
-        EXPECT_EQ(static_cast<uint>(1), i.size());
+        EXPECT_EQ(1, i.size());
 
         auto ev = *i;
         EXPECT_EQ(p.getWriteEnd().getSelectId(), ev.fd);
@@ -127,7 +127,7 @@ TEST_F(TestEPollSelector, testRemoval) {
         s.remove(&p.getWriteEnd());
         auto i = s.poll(1);
         EXPECT_TRUE(i == i.end());
-        EXPECT_EQ(static_cast<uint>(0), i.size());
+        EXPECT_EQ(0, i.size());
     }
 }
 

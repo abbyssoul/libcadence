@@ -17,11 +17,11 @@
 #ifndef CADENCE_ASYNC_EVENTLOOP_HPP
 #define CADENCE_ASYNC_EVENTLOOP_HPP
 
-
+#include <solace/types.hpp>
 #include <memory>  // std::unique_ptr<>
 
 
-namespace cadence { namespace async {
+namespace cadence::async {
 
 /**
  * Event loop.
@@ -34,12 +34,15 @@ namespace cadence { namespace async {
 class EventLoop {
 public:
 
+    using size_type = Solace::uint32;
+
+public:
     ~EventLoop();  // Note: Must be provided for pimpl destructor
 
     EventLoop();
 
-    EventLoop(const EventLoop& rhs) = delete;
-    EventLoop& operator= (const EventLoop& rhs) = delete;
+    EventLoop(EventLoop const& rhs) = delete;
+    EventLoop& operator= (EventLoop const& rhs) = delete;
 
     EventLoop& operator= (EventLoop&& rhs) noexcept {
         return swap(rhs);
@@ -52,9 +55,9 @@ public:
         return rhs;
     }
 
-    bool poll();
+    size_type poll();
 
-    bool isStopped();
+    bool isStopped() const noexcept;
 
     /**
      * Run event processing loop until `stop()` is called or there is no more jobs queued.
@@ -84,7 +87,6 @@ private:
     std::unique_ptr<EventloopImpl> _pimpl;
 };
 
-}  // End of namespace async
-}  // End of namespace cadence
+}  // End of namespace cadence::async
 #endif  // SOLACE_IO_ASYNC_EVENTLOOP_HPP
 
